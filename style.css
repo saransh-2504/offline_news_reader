@@ -1,0 +1,181 @@
+body {
+      background-color: #f8f4ec;
+      color: #222;
+      margin: 0;
+      font-family: "Merriweather", serif;
+      overflow-x: hidden;
+    }
+
+    .logo {
+      font-size: 48px;
+      position: relative;
+      top: 10px;
+      left: 5px;
+      cursor: pointer;
+
+    }
+
+    /* Newspaper-style header */
+    header {
+      color: #000;
+      padding: 30px 20px;
+      font-size: 100px;
+      text-align: center;
+      border-bottom: 5px double #000;
+      font-family: 'Lora', serif;
+    }
+
+    .head-img {
+      position: absolute;
+      width: 100%;
+      height: 250px;
+      top: -100px;
+      left: 0;
+      z-index: -1;
+      opacity: 0.3;
+    }
+
+    .title {
+      font-size: 40px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+
+    .accent {
+      color: #b30000;
+    }
+
+    /* Search bar in newspaper theme */
+    .search-box {
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .search-input {
+      width: 80%;
+      max-width: 700px;
+      padding: 12px 18px;
+      border-radius: 0;
+      border: 2px solid #000;
+      background: #fff;
+      font-size: 16px;
+      font-family: 'Lora', serif;
+    }
+
+    .shadow {
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Category bar styled like newspaper sections */
+    .categories {
+      display: flex;
+      gap: 16px;
+      top: -10px;
+      padding: 10px 20px;
+      overflow-x: auto;
+      border-bottom: 2px solid #000;
+      background: #f2eee5;
+      justify-content: center;
+
+    }
+
+    .cat {
+      padding: 10px 16px;
+      background: #f3f0f0;
+      border: 1px solid #000;
+      font-family: 'Lora', serif;
+      cursor: pointer;
+      transition: 0.3s;
+      text-transform: uppercase;
+      font-size: 13px;
+    }
+
+    .cat:hover {
+      background-color: #b30000;
+      color: white;
+    }
+
+    /* Newspaper grid layout */
+    .news-container {
+      padding: 40px 60px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 40px;
+    }
+
+    /* Article block styled like printed columns */
+    .card {
+      background-color: #ffffff;
+      border: 1px solid #000;
+      padding: 20px;
+      font-family: 'Merriweather', serif;
+      box-shadow: 4px 4px 0 #000;
+      transition: 0.3s;
+    }
+
+    .card:hover {
+      transform: scale(1.02);
+      box-shadow: 6px 6px 0 #000;
+    }
+
+    .card img {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+      border-bottom: 2px solid #000;
+      margin-bottom: 15px;
+    }
+
+    .tag {
+      font-size: 14px;
+      color: #b30000;
+      font-weight: bold;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+
+    .title-text {
+      font-size: 22px;
+      font-weight: 700;
+      margin: 10px 0;
+      font-family: 'Lora', serif;
+    }
+
+    .desc {
+      font-size: 15px;
+      margin-top: 10px;
+      line-height: 1.6;
+    }
+
+    .actions {
+      margin-top: 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 15px;
+    }
+
+    .btn {
+      border: 2px solid #000;
+      padding: 8px 14px;
+      background: #fff;
+      cursor: pointer;
+      font-family: 'Lora', serif;
+      transition: 0.3s;
+    }
+
+    .btn:hover {
+      background:  #b30000;
+      color: white;
+      border-color:  #b30000;
+    }
+
+    footer {
+      margin-top: 40px;
+      padding: 20px;
+      background: #fff;
+      border-top: 5px double #000;
+      text-align: center;
+      font-family: 'Lora', serif;
+    }
