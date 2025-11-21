@@ -38,7 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
     forgotBox.style.display = "block";
   };
 
-  / SIGNUP FUNCTION 
+  // SIGNUP FUNCTION 
   window.signup = function () {
     let user = {
       first: document.getElementById("firstName").value.trim(),
