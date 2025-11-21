@@ -5,7 +5,10 @@ body {
       font-family: "Merriweather", serif;
       overflow-x: hidden;
     }
-
+    a{
+      text-decoration: none;
+      color: inherit; 
+    }
     .logo {
       font-size: 48px;
       position: relative;
