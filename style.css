@@ -1,4 +1,4 @@
-body {
+    body {
       background-color: #f8f4ec;
       color: #222;
       margin: 0;
@@ -13,12 +13,13 @@ body {
       font-size: 48px;
       position: relative;
       top: 10px;
-      left: 5px;
+      left: 0px;
       cursor: pointer;
 
     }
 
     /* Newspaper-style header */
+
     header {
       color: #000;
       padding: 30px 20px;
@@ -50,6 +51,7 @@ body {
     }
 
     /* Search bar in newspaper theme */
+
     .search-box {
       padding: 20px;
       display: flex;
@@ -72,6 +74,7 @@ body {
     }
 
     /* Category bar styled like newspaper sections */
+
     .categories {
       display: flex;
       gap: 16px;
@@ -101,6 +104,7 @@ body {
     }
 
     /* Newspaper grid layout */
+
     .news-container {
       padding: 40px 60px;
       display: grid;
@@ -109,6 +113,7 @@ body {
     }
 
     /* Article block styled like printed columns */
+
     .card {
       background-color: #ffffff;
       border: 1px solid #000;
@@ -182,3 +187,129 @@ body {
       text-align: center;
       font-family: 'Lora', serif;
     }
+
+/* LOGIN PAGE STYLES */
+/* Blur background before login */
+
+body.blur #siteContent{
+  filter: blur(6px);
+  transition: 0.4s ease;
+}
+
+.fade{
+  opacity: 0;
+  animation: fadeIn 0.7s forwards ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Overlay */
+
+#authOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  backdrop-filter: blur(5px);
+  background: rgba(0,0,0,0.3);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 99999;
+  pointer-events: auto;
+}
+
+/* Auth Box */
+
+.auth-box {
+  width: 350px;
+  padding: 30px;
+  background: #fff;
+  border: 2px solid #000;
+  box-shadow: 5px 5px 0 black;
+  font-family: 'Lora', serif;
+  text-align: center;
+}
+
+.auth-box h2 {
+  margin-bottom: 20px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.auth-box input {
+  width: 100%;
+  padding: 12px;
+  margin: 10px 0;
+  border: 2px solid #000;
+  background: #f8f4ec;
+  font-family: 'Lora', serif;
+}
+
+.auth-box button {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #000;
+  background: #b30000;
+  color: white;
+  font-family: 'Lora', serif;
+  cursor: pointer;
+}
+
+.auth-box button:hover {
+  background: black;
+  color: white;
+}
+
+.link {
+  color: #b30000;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+/* Header layout */
+
+.header-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* PROFILE AREA */
+
+.profile-area {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  font-family: 'Lora', serif;
+  font-size: 18px;
+}
+
+/* Greeting Text */
+
+#greetUser {
+  font-weight: bold;
+  color: #b30000;
+  font-size: 18px;
+}
+
+/* Logout Button */
+
+.logout-btn {
+  border: 2px solid #000;
+  padding: 6px 12px;
+  background: #fff;
+  color: #000;
+  font-family: 'Lora', serif;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.logout-btn:hover {
+  background: #b30000;
+  color: #fff;
+}
