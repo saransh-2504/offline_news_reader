@@ -120,7 +120,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 const API_KEY = ""; //01f34776ac18f47af61d0c44277a190d
 const newsContainer = document.querySelector(".news-container");
-const searchInput = document.getElementById("searchInput");
+const searchInput = document.getElementById("searchInput"); 
 const categoryButtons = document.querySelectorAll(".cat");
 
 let currentCategory = "general";
@@ -186,7 +186,14 @@ function displayNews(articles) {
         <div class="title-text">${article.title}</div>
         <div class="desc">${article.description || "No description available."}</div>
         <div class="actions">
-          <span>❤️ Save</span>
+          <span class="save-btn"
+      data-title="${article.title}"
+      data-link="${article.url}"
+      data-img="${article.image || ''}"
+      data-desc="${article.description || ''}">
+      ❤️ Save
+</span>
+
           <a href="${article.url}" class="btn" target="_blank">Read More</a>
         </div>
       </div>
@@ -234,4 +241,31 @@ searchInput.addEventListener("input", () => {
     loadNews();
   }, 500);
 });
+
+// --------------------------------------------------------------
+// SAVE ARTICLE HANDLER
+// --------------------------------------------------------------
+document.addEventListener("click", (e) => {
+  if (e.target.classList.contains("save-btn")) {
+
+    let article = {
+      title: e.target.dataset.title,
+      link: e.target.dataset.link,
+      img: e.target.dataset.img,
+      desc: e.target.dataset.desc
+    };
+
+    let saved = JSON.parse(localStorage.getItem("savedArticles") || "[]");
+
+    // avoid duplicates
+    if (!saved.find(a => a.link === article.link)) {
+      saved.push(article);
+      localStorage.setItem("savedArticles", JSON.stringify(saved));
+      alert("Saved! ❤️");
+    } else {
+      alert("Already saved.");
+    }
+  }
+});
+
 loadNews();

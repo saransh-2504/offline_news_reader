@@ -26,3 +26,56 @@
   <footer>
     © 2025 Offline News Reader | Saved Articles
   </footer>
+  
+  <script>
+  document.addEventListener("DOMContentLoaded", () => {
+
+    let container = document.getElementById("savedList");
+    let saved = JSON.parse(localStorage.getItem("savedArticles") || "[]");
+
+    if (!saved.length) {
+      container.innerHTML = "<h2>No saved articles yet.</h2>";
+      return;
+    }
+
+    saved.forEach(item => {
+      let card = document.createElement("div");
+      card.className = "card";
+
+      card.innerHTML = `
+        <img src="${item.img || 'https://via.placeholder.com/300'}" />
+        <div class="content">
+          <div class="tag">Saved</div>
+          <div class="title-text">${item.title}</div>
+          <div class="desc">${item.desc}</div>
+          <div class="actions">
+            <span class="delete-btn" data-link="${item.link}">🗑 Delete</span>
+            <a href="${item.link}" class="btn" target="_blank">Read More</a>
+          </div>
+        </div>
+      `;
+
+      container.appendChild(card);
+    });
+
+    // Delete handler
+    document.addEventListener("click", (e) => {
+      if (e.target.classList.contains("delete-btn")) {
+
+        let link = e.target.dataset.link;
+
+        saved = saved.filter(a => a.link !== link);
+        localStorage.setItem("savedArticles", JSON.stringify(saved));
+
+        e.target.closest(".card").remove();
+
+        if (!saved.length) {
+          container.innerHTML = "<h2>No saved articles yet.</h2>";
+        }
+      }
+    });
+
+  });
+</script>
+
+</body>
