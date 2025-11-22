@@ -21,7 +21,7 @@
         <input type="email" id="signupEmail" placeholder="Email" />
         <input type="password" id="signupPassword" placeholder="Password" />
 
-        <button onclick="signup()">Sign Up</button>
+        <button onclick="signup()">Sign Up</button>~
 
         <p>
           Already have an account?
@@ -87,24 +87,24 @@
     <!-- SEARCH BAR -->
 
     <div class="search-box">
-      <input type="text" class="search-input" placeholder="Search news..." />
+      <input type="text" id="searchInput" class="search-input" placeholder="Search news..." />
     </div>
 
     <!-- CATEGORY SCROLLER -->
 
     <div class="categories">
-      <div class="cat">All</div>
-      <div class="cat">Technology</div>
-      <div class="cat">Sports</div>
-      <div class="cat">Entertainment</div>
-      <div class="cat">World</div>
+      <div class="cat" data-category="general">All</div>
+      <div class="cat" data-category="technology">Technology</div>
+      <div class="cat" data-category="sports">Sports</div>
+      <div class="cat" data-category="entertainment">Entertainment</div>
+      <div class="cat" data-category="world">World</div>
       <a href="saved.html">
         <div class="cat">Saved ❤️</div>
       </a>
     </div>
 
     <!-- NEWS GRID -->
-     
+
     <div class="news-container fade-in">
 
       <div class="card">
