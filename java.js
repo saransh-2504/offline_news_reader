@@ -115,90 +115,123 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-//  NEWS API + SEARCH + CATEGORY
 
-  const API_KEY = "01f34776ac18f47af61d0c44277a190d"; //01f34776ac18f47af61d0c44277a190d
-  const newsContainer = document.querySelector(".news-container");
-  const searchInput = document.getElementById("searchInput");
-  const categoryButtons = document.querySelectorAll(".cat");
+// GNEWS + INFINITE SCROLL SYSTEM
 
-  let currentCategory = "general";
-  let searchText = "";
+const API_KEY = ""; //01f34776ac18f47af61d0c44277a190d
+const newsContainer = document.querySelector(".news-container");
+const searchInput = document.getElementById("searchInput");
+const categoryButtons = document.querySelectorAll(".cat");
 
-  // debounce
-  let timer;
-  function debounce(fn, delay) {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(fn, delay);
-  }
+let currentCategory = "general";
+let searchText = "";
+let pageIndex = 0;  
+let isLoading = false;
 
-// FETCH NEWS FROM GNEWS
+//imulate more pages
 
-  function loadNews() {
+const RANDOM_QUERIES = [
+  "latest", "breaking news", "india news", "world updates",
+  "news 2025", "global headlines", "today news", "fresh news"
+];
 
-// Build API URL
-    let url = `https://gnews.io/api/v4/search?q=${searchText || "latest"}&topic=${currentCategory}&lang=en&apikey=${API_KEY}`;
 
-    fetch(url)
-      .then(res => res.json())
-      .then(data => {
-        displayNews(data.articles);
-      })
-      .catch(() => {
-        newsContainer.innerHTML = "<h2>Error loading news.</h2>";
-      });
-  }
+// Build GNews API 
 
-  // DISPLAY NEWS IN GRID
+function buildApiURL() {
+  let q = searchText || RANDOM_QUERIES[pageIndex % RANDOM_QUERIES.length];
 
-  function displayNews(articles) {
+  return `https://gnews.io/api/v4/search?q=${encodeURIComponent(q)}&topic=${currentCategory}&lang=en&apikey=${API_KEY}`;
+}
 
-    newsContainer.innerHTML = ""; 
+// Fetch news from GNews
 
-    if (!articles || articles.length === 0) {
-      newsContainer.innerHTML = "<h2>No news found.</h2>";
+async function loadNews() {
+  if (isLoading) return;
+  isLoading = true;
+
+  let url = buildApiURL();
+
+  try {
+    let res = await fetch(url);
+    let data = await res.json();
+
+    if (!data.articles) {
+      isLoading = false;
       return;
     }
 
-    articles.forEach(article => {
+    displayNews(data.articles);
+    pageIndex++; 
 
-      let card = document.createElement("div");
-      card.className = "card";
-
-      card.innerHTML = `
-        <img src="${article.image || "https://via.placeholder.com/300"}" />
-        <div class="content">
-          <div class="tag">${currentCategory.toUpperCase()}</div>
-          <div class="title-text">${article.title}</div>
-          <div class="desc">${article.description || "No description available."}</div>
-          <div class="actions">
-            <span>❤️ Save</span>
-            <a href="${article.url}" target="_blank" class="btn">Read More</a>
-          </div>
-        </div>
-      `;
-
-      newsContainer.appendChild(card);
-    });
+  } catch (e) {
+    console.log("API ERROR:", e);
   }
 
-// CATEGORY CLICK
+  isLoading = false;
+}
 
-  categoryButtons.forEach(btn => {
-    btn.addEventListener("click", () => {
+// Display news
 
-      currentCategory = btn.dataset.category;
-      loadNews();
-    });
+function displayNews(articles) {
+
+  articles.forEach(article => {
+    let card = document.createElement("div");
+    card.className = "card";
+
+    card.innerHTML = `
+      <img src="${article.image || 'https://via.placeholder.com/300'}" />
+      <div class="content">
+        <div class="tag">${currentCategory.toUpperCase()}</div>
+        <div class="title-text">${article.title}</div>
+        <div class="desc">${article.description || "No description available."}</div>
+        <div class="actions">
+          <span>❤️ Save</span>
+          <a href="${article.url}" class="btn" target="_blank">Read More</a>
+        </div>
+      </div>
+    `;
+
+    newsContainer.appendChild(card);
   });
+}
 
-// SEARCH INPUT (Debounced)
+// Infinite scrolling
 
-  searchInput.addEventListener("input", () => {
-    debounce(() => {
-      searchText = searchInput.value.trim();
-      loadNews();
-    }, 500);
+window.addEventListener("scroll", () => {
+  if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
+    loadNews();
+  }
+});
+
+// Category filter
+
+categoryButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+
+    currentCategory = btn.dataset.category;
+
+    // Reset page
+    newsContainer.innerHTML = "";
+    pageIndex = 0;
+
+    loadNews();
   });
+});
 
-  loadNews();
+// Search handler 
+
+let searchTimer;
+searchInput.addEventListener("input", () => {
+  clearTimeout(searchTimer);
+
+  searchTimer = setTimeout(() => {
+    searchText = searchInput.value.trim();
+
+    newsContainer.innerHTML = "";
+    pageIndex = 0;
+
+    loadNews();
+  }, 500);
+});
+loadNews();
