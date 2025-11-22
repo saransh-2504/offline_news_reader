@@ -113,5 +113,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
     alert("Logged out!");
   }
-
 });
