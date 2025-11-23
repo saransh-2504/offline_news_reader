@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -10,72 +11,85 @@
 <body>
 
   <header>
-    <img class="head-img" src="https://media.istockphoto.com/id/1402360271/vector/seamless-pattern-with-a-collage-of-newspaper-or-magazine-clippings.jpg?s=612x612&w=0&k=20&c=GEGdqIvAipMBTeU3XQR6lHMCdonVWa1U13i05iUMrMw=" />
+    <img class="head-img"
+      src="https://media.istockphoto.com/id/1402360271/vector/seamless-pattern-with-a-collage-of-newspaper-or-magazine-clippings.jpg?s=612x612&w=0&k=20&c=GEGdqIvAipMBTeU3XQR6lHMCdonVWa1U13i05iUMrMw=" />
     <div class="title fade-in">Saved Articles ❤</div>
     <div class="logo" onclick="history.back()">🔙</div>
   </header>
-
   <!-- NEWS GRID -->
-
   <div class="news-container fade-in" id="savedList">
-    
-    <!-- Saved cards load here -->
-
   </div>
-
   <footer>
     © 2025 Offline News Reader | Saved Articles
   </footer>
-  
+
   <script>
-  document.addEventListener("DOMContentLoaded", () => {
+    document.addEventListener("DOMContentLoaded", () => {
 
-    let container = document.getElementById("savedList");
-    let saved = JSON.parse(localStorage.getItem("savedArticles") || "[]");
+      let container = document.getElementById("savedList");
 
-    if (!saved.length) {
-      container.innerHTML = "<h2>No saved articles yet.</h2>";
-      return;
-    }
+      let request = indexedDB.open("newsDB", 2);
 
-    saved.forEach(item => {
-      let card = document.createElement("div");
-      card.className = "card";
+      request.onsuccess = function (e) {
+        let db = e.target.result;
 
-      card.innerHTML = `
-        <img src="${item.img || 'https://via.placeholder.com/300'}" />
-        <div class="content">
-          <div class="tag">Saved</div>
-          <div class="title-text">${item.title}</div>
-          <div class="desc">${item.desc}</div>
-          <div class="actions">
-            <span class="delete-btn" data-link="${item.link}">🗑 Delete</span>
-            <a href="${item.link}" class="btn" target="_blank">Read More</a>
+        let tx = db.transaction("saved", "readonly");
+        let store = tx.objectStore("saved");
+
+        let getAll = store.getAll();
+
+        getAll.onsuccess = function () {
+          let items = getAll.result || [];
+
+          if (!items.length) {
+            container.innerHTML = "<h2>No saved articles yet.</h2>";
+            return;
+          }
+
+          items.forEach(item => {
+            let card = document.createElement("div");
+            card.className = "card";
+
+            card.innerHTML = `
+          <img src="${item.img || 'https://via.placeholder.com/300'}" />
+          <div class="content">
+            <div class="tag">Saved</div>
+            <div class="title-text">${item.title}</div>
+            <div class="desc">${item.desc}</div>
+            <div class="actions">
+              <span class="delete-btn" data-link="${item.link}">🗑 Delete</span>
+              <a href="${item.link}" class="btn" target="_blank">Read More</a>
+            </div>
           </div>
-        </div>
-      `;
+        `;
 
-      container.appendChild(card);
-    });
+            container.appendChild(card);
+          });
 
-    // Delete handler
-    document.addEventListener("click", (e) => {
-      if (e.target.classList.contains("delete-btn")) {
+          // DELETE SAVED ARTICLE
+          document.addEventListener("click", (e) => {
+            if (e.target.classList.contains("delete-btn")) {
+              let link = e.target.dataset.link;
 
-        let link = e.target.dataset.link;
+              let tx2 = db.transaction("saved", "readwrite");
+              let store2 = tx2.objectStore("saved");
+              store2.delete(link);
 
-        saved = saved.filter(a => a.link !== link);
-        localStorage.setItem("savedArticles", JSON.stringify(saved));
+              e.target.closest(".card").remove();
 
-        e.target.closest(".card").remove();
-
-        if (!saved.length) {
-          container.innerHTML = "<h2>No saved articles yet.</h2>";
-        }
+              if (!container.children.length) {
+                container.innerHTML = "<h2>No saved articles yet.</h2>";
+              }
+            }
+          });
+        };
+      };
+      request.onerror = function () {
+        container.innerHTML = "<h2>Could not open local DB.</h2>";
       }
     });
+  </script>
 
-  });
-</script>
 
 </body>
+</html>

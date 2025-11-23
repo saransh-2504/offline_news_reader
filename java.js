@@ -4,22 +4,53 @@ document.addEventListener("DOMContentLoaded", () => {
   const signupBox = document.getElementById("signupBox");
   const loginBox = document.getElementById("loginBox");
   const forgotBox = document.getElementById("forgotBox");
+  const greetUser = document.getElementById("greetUser");
+  const newsContainer = document.querySelector(".news-container");
+  const searchInput = document.getElementById("searchInput");
+  const categoryButtons = document.querySelectorAll(".cat");
+  const offlineBanner = document.getElementById("offlineBanner");
 
-  // APPLY BLUR WHEN PAGE LOADS 
+
+// INDEXEDDB (newsDB)
+
+  let db;
+  const DB_VERSION = 2;
+  const DB_NAME = "newsDB";
+
+  const openReq = indexedDB.open(DB_NAME, DB_VERSION);
+
+  openReq.onupgradeneeded = (e) => {
+    db = e.target.result;
+    if (!db.objectStoreNames.contains("articles")) {
+      db.createObjectStore("articles", { keyPath: "link" });
+    }
+    if (!db.objectStoreNames.contains("saved")) {
+      db.createObjectStore("saved", { keyPath: "link" });
+    }
+  };
+
+  openReq.onsuccess = (e) => {
+    db = e.target.result;
+    console.log("IndexedDB ready");
+  };
+
+  openReq.onerror = (e) => {
+    console.warn("IndexedDB failed to open", e);
+  };
+
+//signup, login, logout, forgot
 
   document.body.classList.add("blur");
 
-  // AUTO LOGIN CHECK 
+  const storedUser = JSON.parse(localStorage.getItem("userData") || "null");
   const loggedUser = localStorage.getItem("loggedUser");
-  const userData = JSON.parse(localStorage.getItem("userData"));
 
-  if (loggedUser && userData) {
-    greetUser.innerText = "Welcome, " + userData.first + "!";
+  if (loggedUser && storedUser) {
+    greetUser.innerText = "Welcome, " + storedUser.first + "!";
     authOverlay.style.display = "none";
     document.body.classList.remove("blur");
   }
 
-  // SWITCH SCREENS 
   window.showLogin = function () {
     signupBox.style.display = "none";
     loginBox.style.display = "block";
@@ -38,234 +69,309 @@ document.addEventListener("DOMContentLoaded", () => {
     forgotBox.style.display = "block";
   };
 
-  // SIGNUP FUNCTION 
   window.signup = function () {
-    let user = {
-      first: document.getElementById("firstName").value.trim(),
-      last: document.getElementById("lastName").value.trim(),
-      email: document.getElementById("signupEmail").value.trim(),
-      password: document.getElementById("signupPassword").value.trim(),
-    };
+    try {
+      const user = {
+        first: document.getElementById("firstName").value.trim(),
+        last: document.getElementById("lastName").value.trim(),
+        email: document.getElementById("signupEmail").value.trim(),
+        password: document.getElementById("signupPassword").value.trim()
+      };
 
-    if (!user.first || !user.last || !user.email || !user.password) {
-      alert("Please fill all fields.");
-      return;
-    }
+      if (!user.first || !user.last || !user.email || !user.password) {
+        alert("Please fill all fields.");
+        return;
+      }
 
-    localStorage.setItem("userData", JSON.stringify(user));
-    localStorage.setItem("loggedUser", user.email);
-
-    greetUser.innerText = "Welcome, " + user.first + "!";
-
-    // SUCCESS → close modal
-
-    authOverlay.classList.add("fade");
-    authOverlay.style.display = "none";
-    document.body.classList.remove("blur");
-  };
-
-  // LOGIN FUNCTION 
-  window.login = function () {
-    let email = document.getElementById("loginEmail").value.trim();
-    let pass = document.getElementById("loginPassword").value.trim();
-
-    let user = JSON.parse(localStorage.getItem("userData"));
-    if (!user) return alert("No account. Sign up first.");
-
-
-    if (email === user.email && pass === user.password) {
+      localStorage.setItem("userData", JSON.stringify(user));
       localStorage.setItem("loggedUser", user.email);
 
       greetUser.innerText = "Welcome, " + user.first + "!";
-
-      authOverlay.classList.add("fade");
       authOverlay.style.display = "none";
       document.body.classList.remove("blur");
-    } else {
-      alert("Incorrect credentials.");
+
+    } catch (err) {
+      console.error("Signup error:", err);
+      alert("An error occurred during signup.");
     }
   };
 
-  // RESET PASSWORD FUNCTION 
+  window.login = function () {
+    try {
+      const email = document.getElementById("loginEmail").value.trim();
+      const pass = document.getElementById("loginPassword").value.trim();
+      const user = JSON.parse(localStorage.getItem("userData") || "null");
+
+      if (!user) {
+        alert("No account found. Please sign up first.");
+        return;
+      }
+
+      if (email === user.email && pass === user.password) {
+        localStorage.setItem("loggedUser", user.email);
+        greetUser.innerText = "Welcome, " + user.first + "!";
+        authOverlay.style.display = "none";
+        document.body.classList.remove("blur");
+      } else {
+        alert("Incorrect email or password.");
+      }
+    } catch (err) {
+      console.error("Login error:", err);
+      alert("An error occurred during login.");
+    }
+  };
+
   window.resetPassword = function () {
-    let email = document.getElementById("forgotEmail").value.trim();
-    let newPass = document.getElementById("newPassword").value.trim();
+    try {
+      const email = document.getElementById("forgotEmail").value.trim();
+      const newPass = document.getElementById("newPassword").value.trim();
+      const user = JSON.parse(localStorage.getItem("userData") || "null");
 
-    let user = JSON.parse(localStorage.getItem("userData"));
+      if (!user || email !== user.email) {
+        alert("Email not found!");
+        return;
+      }
 
-    if (!user || email !== user.email) {
-      return alert("Email not found!");
+      user.password = newPass;
+      localStorage.setItem("userData", JSON.stringify(user));
+      alert("Password reset successful!");
+      showLogin();
+    } catch (err) {
+      console.error("Reset error:", err);
+      alert("An error occurred.");
     }
-
-    user.password = newPass;
-    localStorage.setItem("userData", JSON.stringify(user));
-
-    alert("Password reset successful!");
-    showLogin();
   };
 
-  // LOGOUT
-  window.logout = () => {
+  window.logout = function () {
     localStorage.removeItem("loggedUser");
-
     document.body.classList.add("blur");
     authOverlay.style.display = "flex";
-
     alert("Logged out!");
+  };
+
+// GNEWS INFINITE SCROLL
+
+  const API_KEY = ""; // 01f34776ac18f47af61d0c44277a190d  --> api key 
+  let currentCategory = "general";
+  let searchText = "";
+  let pageIndex = 0;
+  let isLoading = false;
+
+  const RANDOM_QUERIES = [
+    "latest", "breaking news", "india news", "world updates",
+    "news 2025", "global headlines", "today news", "fresh news"
+  ];
+
+  function buildApiURL() {
+    const q = searchText || RANDOM_QUERIES[pageIndex % RANDOM_QUERIES.length];
+    return `https://gnews.io/api/v4/search?q=${encodeURIComponent(q)}&topic=${currentCategory}&lang=en&apikey=${API_KEY}`;
   }
-});
 
+  async function loadNews() {
+    if (!navigator.onLine) {
+      console.log("Loading articles from IndexedDB (offline)");
+      showOfflineBanner(true);
+      loadFromDBArticles();
+      return;
+    } else {
+      showOfflineBanner(false);
+    }
 
-// GNEWS + INFINITE SCROLL SYSTEM
-
-const API_KEY = ""; //01f34776ac18f47af61d0c44277a190d
-const newsContainer = document.querySelector(".news-container");
-const searchInput = document.getElementById("searchInput"); 
-const categoryButtons = document.querySelectorAll(".cat");
-
-let currentCategory = "general";
-let searchText = "";
-let pageIndex = 0;  
-let isLoading = false;
-
-//imulate more pages
-
-const RANDOM_QUERIES = [
-  "latest", "breaking news", "india news", "world updates",
-  "news 2025", "global headlines", "today news", "fresh news"
-];
-
-
-// Build GNews API 
-
-function buildApiURL() {
-  let q = searchText || RANDOM_QUERIES[pageIndex % RANDOM_QUERIES.length];
-
-  return `https://gnews.io/api/v4/search?q=${encodeURIComponent(q)}&topic=${currentCategory}&lang=en&apikey=${API_KEY}`;
-}
-
-// Fetch news from GNews
-
-async function loadNews() {
-  if (isLoading) return;
-  isLoading = true;
-
-  let url = buildApiURL();
-
-  try {
-    let res = await fetch(url);
-    let data = await res.json();
-
-    if (!data.articles) {
-      isLoading = false;
+    if (isLoading) return;
+    if (!API_KEY) {
+      newsContainer.innerHTML = "<h3>Please add your GNews API key in java.js to load online news. Loading cached articles if available...</h3>";
+      loadFromDBArticles();
       return;
     }
 
-    displayNews(data.articles);
-    pageIndex++; 
+    isLoading = true;
+    const url = buildApiURL();
 
-  } catch (e) {
-    console.log("API ERROR:", e);
-  }
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
 
-  isLoading = false;
-}
+      if (data && data.articles && data.articles.length) {
+        // Save articles into saved section
+        try {
+          const tx = db.transaction("articles", "readwrite");
+          const store = tx.objectStore("articles");
+          data.articles.forEach(a => {
+            const articleObj = {
+              title: a.title || "",
+              description: a.description || "",
+              url: a.url || a.link || "",
+              image: a.image || "",
+              publishedAt: a.publishedAt || a.pubDate || ""
+            };
+            articleObj.link = articleObj.url;
+            store.put(articleObj);
+          });
+        } catch (err) {
+          console.warn("Could not write to DB articles store:", err);
+        }
 
-// Display news
+        // Display articles
+        displayNews(data.articles.map(a => ({
+          title: a.title,
+          description: a.description,
+          link: a.url || a.link,
+          image: a.image || '',
+        })));
 
-function displayNews(articles) {
-
-  articles.forEach(article => {
-    let card = document.createElement("div");
-    card.className = "card";
-
-    card.innerHTML = `
-      <img src="${article.image || 'https://via.placeholder.com/300'}" />
-      <div class="content">
-        <div class="tag">${currentCategory.toUpperCase()}</div>
-        <div class="title-text">${article.title}</div>
-        <div class="desc">${article.description || "No description available."}</div>
-        <div class="actions">
-          <span class="save-btn"
-      data-title="${article.title}"
-      data-link="${article.url}"
-      data-img="${article.image || ''}"
-      data-desc="${article.description || ''}">
-      ❤️ Save
-</span>
-
-          <a href="${article.url}" class="btn" target="_blank">Read More</a>
-        </div>
-      </div>
-    `;
-
-    newsContainer.appendChild(card);
-  });
-}
-
-// Infinite scrolling
-
-window.addEventListener("scroll", () => {
-  if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
-    loadNews();
-  }
-});
-
-// Category filter
-
-categoryButtons.forEach(btn => {
-  btn.addEventListener("click", () => {
-
-    currentCategory = btn.dataset.category;
-
-    // Reset page
-    newsContainer.innerHTML = "";
-    pageIndex = 0;
-
-    loadNews();
-  });
-});
-
-// Search handler 
-
-let searchTimer;
-searchInput.addEventListener("input", () => {
-  clearTimeout(searchTimer);
-
-  searchTimer = setTimeout(() => {
-    searchText = searchInput.value.trim();
-
-    newsContainer.innerHTML = "";
-    pageIndex = 0;
-
-    loadNews();
-  }, 500);
-});
-
-// --------------------------------------------------------------
-// SAVE ARTICLE HANDLER
-// --------------------------------------------------------------
-document.addEventListener("click", (e) => {
-  if (e.target.classList.contains("save-btn")) {
-
-    let article = {
-      title: e.target.dataset.title,
-      link: e.target.dataset.link,
-      img: e.target.dataset.img,
-      desc: e.target.dataset.desc
-    };
-
-    let saved = JSON.parse(localStorage.getItem("savedArticles") || "[]");
-
-    // avoid duplicates
-    if (!saved.find(a => a.link === article.link)) {
-      saved.push(article);
-      localStorage.setItem("savedArticles", JSON.stringify(saved));
-      alert("Saved! ❤️");
-    } else {
-      alert("Already saved.");
+        pageIndex++;
+      } else {
+        console.warn("No articles returned from GNews for URL:", url);
+      }
+    } catch (err) {
+      console.error("GNews fetch error:", err);
+    } finally {
+      isLoading = false;
     }
   }
-});
+  function displayNews(articles) {
+    if (!articles || !articles.length) {
+      if (!newsContainer.children.length) {
+        newsContainer.innerHTML = "<h3>No news found.</h3>";
+      }
+      return;
+    }
 
-loadNews();
+    articles.forEach(article => {
+      const card = document.createElement("div");
+      card.className = "card";
+
+      const safeTitle = (article.title || "No title").replace(/"/g, '&quot;');
+      const safeDesc = (article.description || "").replace(/"/g, '&quot;');
+      const safeImg = (article.image || '').replace(/"/g, '&quot;');
+
+      card.innerHTML = `
+        <img src="${article.image || article.imageUrl || 'https://via.placeholder.com/300'}" alt="article image" />
+        <div class="content">
+          <div class="tag">${currentCategory.toUpperCase()}</div>
+          <div class="title-text">${article.title || ""}</div>
+          <div class="desc">${article.description || ""}</div>
+          <div class="actions">
+            <span class="save-btn" data-link="${article.link}" data-title="${safeTitle}" data-img="${safeImg}" data-desc="${safeDesc}">❤️ Save</span>
+            <a href="${article.link}" class="btn" target="_blank" rel="noopener">Read More</a>
+          </div>
+        </div>
+      `;
+
+      newsContainer.appendChild(card);
+    });
+  }
+
+  // Load articles from saved section
+  function loadFromDBArticles() {
+    if (!db) {
+      newsContainer.innerHTML = "<h3>No local DB available.</h3>";
+      return;
+    }
+
+    const tx = db.transaction("articles", "readonly");
+    const store = tx.objectStore("articles");
+    const req = store.getAll();
+
+    req.onsuccess = () => {
+      const items = req.result || [];
+      if (!items.length) {
+        newsContainer.innerHTML = "<h3>No cached articles available.</h3>";
+        return;
+      }
+      newsContainer.innerHTML = "";
+      displayNews(items.map(i => ({
+        title: i.title,
+        description: i.description,
+        link: i.link,
+        image: i.image
+      })));
+    };
+
+    req.onerror = () => {
+      newsContainer.innerHTML = "<h3>Could not load cached articles.</h3>";
+    };
+  }
+
+  function showOfflineBanner(show) {
+    if (!offlineBanner) return;
+    offlineBanner.style.display = show ? "block" : "none";
+  }
+
+  // Infinite scroll trigger
+  window.addEventListener("scroll", () => {
+    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
+      loadNews();
+    }
+  });
+
+  // Category click handler
+  categoryButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      categoryButtons.forEach(b => b.classList.remove("active-cat"));
+      btn.classList.add("active-cat");
+
+      currentCategory = btn.dataset.category || "general";
+      newsContainer.innerHTML = "";
+      pageIndex = 0;
+      loadNews();
+    });
+  });
+
+  // Debounced search
+  let searchTimer;
+  searchInput.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      searchText = searchInput.value.trim();
+      newsContainer.innerHTML = "";
+      pageIndex = 0;
+      loadNews();
+    }, 500);
+  });
+
+  // Save article into saved store
+  document.addEventListener("click", (e) => {
+    if (e.target && e.target.classList.contains("save-btn")) {
+      const link = e.target.dataset.link;
+      const title = e.target.dataset.title || "Untitled";
+      const img = e.target.dataset.img || "";
+      const desc = e.target.dataset.desc || "";
+
+      if (!db) {
+        alert("Local DB not ready. Try again in a moment.");
+        return;
+      }
+
+      const tx = db.transaction("saved", "readwrite");
+      const store = tx.objectStore("saved");
+      const article = { link, title, img, desc };
+
+      const putReq = store.put(article);
+      putReq.onsuccess = () => alert("Saved offline! ❤️");
+      putReq.onerror = () => alert("Could not save article.");
+    }
+  });
+
+  window.addEventListener("online", () => {
+    showOfflineBanner(false);
+    newsContainer.innerHTML = "";
+    pageIndex = 0;
+    loadNews();
+  });
+
+  window.addEventListener("offline", () => {
+    showOfflineBanner(true);
+    loadFromDBArticles();
+  });
+
+  setTimeout(() => {
+    if (!navigator.onLine) {
+      showOfflineBanner(true);
+      loadFromDBArticles();
+    } else {
+      loadNews();
+    }
+  }, 300);
+
+});

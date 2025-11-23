@@ -9,8 +9,7 @@
 </head>
 
 <body>
-  <!-- SIGNUP FORM -->
-
+<!-- SIGNUP FORM -->
   <div id="authOverlay" class="fade">
     <div class="auth-box fade">
       <div id="signupBox">
@@ -29,8 +28,7 @@
         </p>
       </div>
 
-      <!-- LOGIN FORM -->
-
+<!-- LOGIN FORM -->
       <div id="loginBox" style="display:none;">
         <h2>Login</h2>
 
@@ -50,8 +48,7 @@
         </p>
       </div>
 
-      <!-- FORGOT PASSWORD -->
-
+<!-- FORGOT PASSWORD -->
       <div id="forgotBox" style="display:none;">
         <h2>Reset Password</h2>
 
@@ -68,15 +65,14 @@
 
   <div id="siteContent">
 
-    <!-- HEADER -->
-
+<!-- HEADER -->
     <header>
       <img class="head-img"
         src="https://media.istockphoto.com/id/1402360271/vector/seamless-pattern-with-a-collage-of-newspaper-or-magazine-clippings.jpg?s=612x612&w=0&k=20&c=GEGdqIvAipMBTeU3XQR6lHMCdonVWa1U13i05iUMrMw="
         alt="back" />
       <div class="header-flex">
         <div class="title">Offline News Reader</div>
-        <div class="logo">🌙</div>
+        <div class="logo" id="themeToggle">🌙</div>
         <div class="profile-area">
           <span id="greetUser">Welcome!</span>
           <button class="logout-btn" onclick="logout()">Logout</button>
@@ -84,14 +80,12 @@
       </div>
     </header>
 
-    <!-- SEARCH BAR -->
-
+<!-- SEARCH BAR -->
     <div class="search-box">
       <input type="text" id="searchInput" class="search-input" placeholder="Search news..." />
     </div>
 
-    <!-- CATEGORY SCROLLER -->
-
+<!-- CATEGORY SCROLLER -->
     <div class="categories">
       <div class="cat" data-category="general">All</div>
       <div class="cat" data-category="technology">Technology</div>
@@ -103,8 +97,7 @@
       </a>
     </div>
 
-    <!-- NEWS GRID -->
-
+<!-- NEWS GRID -->
     <div class="news-container fade-in">
 
       <div class="card">
@@ -115,44 +108,44 @@
           <div class="title-text">AI Revolution in 2025</div>
           <div class="desc">Artificial Intelligence is evolving faster than expected...</div>
           <div class="actions">
-            <span>❤️ Save</span>
+            <span class="save-btn" data-link="#" data-title="AI Revolution" data-img="" data-desc="">❤️ Save</span>
             <span class="btn">Read More</span>
           </div>
         </div>
       </div>
 
-      <div class="card">
-        <img
-          src="https://res.cloudinary.com/dvklutj2x/images/w_1920,h_1200/fl_progressive,q_auto,f_auto,dpr_auto/f_auto,q_auto:best/v1684999072/Times-Sports_Component-3/Times-Sports_Component-3.gif?_i=AA" />
-        <div class="content">
-          <div class="tag">SPORTS</div>
-          <div class="title-text">World Cup Highlights</div>
-          <div class="desc">The finals were packed with thrilling moments...</div>
-          <div class="actions">
-            <span>❤️ Save</span>
-            <span class="btn">Read More</span>
-          </div>
+    <div class="card">
+      <img
+        src="https://res.cloudinary.com/dvklutj2x/images/w_1920,h_1200/fl_progressive,q_auto,f_auto,dpr_auto/f_auto,q_auto:best/v1684999072/Times-Sports_Component-3/Times-Sports_Component-3.gif?_i=AA" />
+      <div class="content">
+        <div class="tag">SPORTS</div>
+        <div class="title-text">World Cup Highlights</div>
+        <div class="desc">The finals were packed with thrilling moments...</div>
+        <div class="actions">
+           <span class="save-btn" data-link="#" data-title="AI Revolution" data-img="" data-desc="">❤️ Save</span>
+          <span class="btn">Read More</span>
         </div>
       </div>
-
-      <div class="card">
-        <img src="https://www.printnewspaper.com/static/resources/newspaper-template/daily-news.jpg" />
-        <div class="content">
-          <div class="tag">ENTERTAINMENT</div>
-          <div class="title-text">Sci-Fi Movie Breaks Records</div>
-          <div class="desc">A spectacular blend of futuristic visuals and story...</div>
-          <div class="actions">
-            <span>❤️ Save</span>
-            <span class="btn">Read More</span>
-          </div>
-        </div>
-      </div>
-
     </div>
 
-    <footer>
-      © 2025 Offline News Reader | OJT Project
-    </footer>
+    <div class="card">
+      <img src="https://www.printnewspaper.com/static/resources/newspaper-template/daily-news.jpg" />
+      <div class="content">
+        <div class="tag">ENTERTAINMENT</div>
+        <div class="title-text">Sci-Fi Movie Breaks Records</div>
+        <div class="desc">A spectacular blend of futuristic visuals and story...</div>
+        <div class="actions">
+           <span class="save-btn" data-link="#" data-title="AI Revolution" data-img="" data-desc="">❤️ Save</span>
+          <span class="btn">Read More</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    © 2025 Offline News Reader | OJT Project
+  </footer>
   </div>
 </body>
 <script src="java.js"></script>
