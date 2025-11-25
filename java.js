@@ -109,7 +109,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (email === user.email && pass === user.password) {
         localStorage.setItem("loggedUser", user.email);
-        greetUser.innerText = "Welcome, " + user.first + "!";
+        greetUser.innerText = "WELCOME, " + user.first + "!";
         authOverlay.style.display = "none";
         document.body.classList.remove("blur");
       } else {
@@ -151,7 +151,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // GNEWS INFINITE SCROLL
 
-  const API_KEY = ""; // 01f34776ac18f47af61d0c44277a190d  --> api key 
+  const API_KEY = ""; // --> api key 
   let currentCategory = "general";
   let searchText = "";
   let pageIndex = 0;
@@ -327,7 +327,7 @@ document.addEventListener("DOMContentLoaded", () => {
       newsContainer.innerHTML = "";
       pageIndex = 0;
       loadNews();
-    }, 500);
+    }, 1500);
   });
 
   // Save article into saved store
