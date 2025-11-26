@@ -24,6 +24,37 @@
 
     }
 
+    /* Saved page logo style */
+
+    .logo_saved{
+      font-size: 48px;
+      position: absolute;
+      top: 18px;
+      left: 25px;
+      cursor: pointer;
+      background: none;
+      border: none;
+      transition: 4s;
+    }
+    .title_fade-in{
+      font-size: 40px;
+      font-weight: 900;
+      position: relative;
+      font-family: Georgia, 'Times New Roman', Times, serif;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      left: 20px;
+      transition: 4s;
+    }
+
+    .delete-btn{
+      cursor: pointer;
+    }
+
+    .save-btn{
+      cursor: pointer;
+    }
+    
     /* Newspaper-style header */
 
     header {
