@@ -9,6 +9,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const searchInput = document.getElementById("searchInput");
   const categoryButtons = document.querySelectorAll(".cat");
   const offlineBanner = document.getElementById("offlineBanner");
+  const loader = document.getElementById("loader");
+
 
 
   // INDEXEDDB (newsDB)
@@ -178,6 +180,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (isLoading) return;
+    loader.style.display = "block";
+
     if (!API_KEY) {
       newsContainer.innerHTML = "<h3>Please add your GNews API key in java.js to load online news. Loading cached articles if available...</h3>";
       loadFromDBArticles();
@@ -228,6 +232,8 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("GNews fetch error:", err);
     } finally {
       isLoading = false;
+      loader.style.display = "none";
+
     }
   }
   function displayNews(articles) {
