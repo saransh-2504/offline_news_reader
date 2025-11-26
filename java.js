@@ -11,7 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const offlineBanner = document.getElementById("offlineBanner");
 
 
-// INDEXEDDB (newsDB)
+  // INDEXEDDB (newsDB)
 
   let db;
   const DB_VERSION = 2;
@@ -38,7 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.warn("IndexedDB failed to open", e);
   };
 
-//signup, login, logout, forgot
+  //signup, login, logout, forgot
 
   document.body.classList.add("blur");
 
@@ -149,7 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
     alert("Logged out!");
   };
 
-// GNEWS INFINITE SCROLL
+  // GNEWS INFINITE SCROLL
 
   const API_KEY = ""; // --> api key 
   let currentCategory = "general";
@@ -192,6 +192,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await res.json();
 
       if (data && data.articles && data.articles.length) {
+
         // Save articles into saved section
         try {
           const tx = db.transaction("articles", "readwrite");
@@ -246,19 +247,40 @@ document.addEventListener("DOMContentLoaded", () => {
       const safeImg = (article.image || '').replace(/"/g, '&quot;');
 
       card.innerHTML = `
-        <img src="${article.image || article.imageUrl || 'https://via.placeholder.com/300'}" alt="article image" />
-        <div class="content">
-          <div class="tag">${currentCategory.toUpperCase()}</div>
-          <div class="title-text">${article.title || ""}</div>
-          <div class="desc">${article.description || ""}</div>
-          <div class="actions">
-            <span class="save-btn" data-link="${article.link}" data-title="${safeTitle}" data-img="${safeImg}" data-desc="${safeDesc}">❤️ Save</span>
-            <a href="${article.link}" class="btn" target="_blank" rel="noopener">Read More</a>
-          </div>
+      <img src="${article.image || article.imageUrl || 'https://via.placeholder.com/300'}" alt="article image" />
+      <div class="content">
+        <div class="tag">${currentCategory.toUpperCase()}</div>
+        <div class="title-text">${article.title || ""}</div>
+        <div class="desc">${article.description || ""}</div>
+        <div class="actions">
+        <span class="save-btn" data-link="${article.link}" data-title="${safeTitle}" data-img="${safeImg}" data-desc="${safeDesc}">🤍 Save</span>
+        <a href="${article.link}" class="btn" target="_blank" rel="noopener">Read More</a>
         </div>
+      </div>
       `;
 
       newsContainer.appendChild(card);
+
+      (function markSavedIfNeeded() {
+        if (!db) return;
+        try {
+          const link = article.link;
+          const tx = db.transaction("saved", "readonly");
+          const store = tx.objectStore("saved");
+          const getReq = store.get(link);
+          getReq.onsuccess = () => {
+            if (getReq.result) {
+              const btn = card.querySelector(".save-btn");
+              if (btn) {
+                btn.classList.add("saved");
+                btn.innerHTML = '❤️ Saved';
+              }
+            }
+          };
+        } catch (err) {
+          console.warn("Could not check saved state:", err);
+        }
+      })();
     });
   }
 
@@ -348,8 +370,15 @@ document.addEventListener("DOMContentLoaded", () => {
       const article = { link, title, img, desc };
 
       const putReq = store.put(article);
-      putReq.onsuccess = () => alert("Saved offline! ❤️");
-      putReq.onerror = () => alert("Could not save article.");
+      putReq.onsuccess = () => {
+        e.target.classList.add("saved");
+        e.target.innerHTML = '❤️ Saved';
+        // alert("Saved offline! ❤️");
+      };
+      putReq.onerror = () => {
+        alert("Could not save article.");
+      };
+
     }
   });
 
