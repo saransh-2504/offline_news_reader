@@ -398,15 +398,32 @@
       background: #b30000;
       color: #fff;
     }
-    /* SIMPLE DARK MODE (no variables) */
+
+    /* DARK MODE */
+
     body.dark {
       background-color: #0b1020;
       color: #e6eef8;
     }
 
-    body.dark header,
-    body.dark footer,
-    body.dark .auth-box,
+    body.dark header{
+      background-color: #0f1724;
+      color: #e6eef8;
+      border-color: #2b3440;
+    }
+
+    body.dark footer{
+      background-color: #0f1724;
+      color: #e6eef8;
+      border-color: #2b3440;
+    }
+
+    body.dark .auth-box{
+      background-color: #0f1724;
+      color: #e6eef8;
+      border-color: #2b3440;
+    }
+
     body.dark .card {
       background-color: #0f1724;
       color: #e6eef8;
@@ -419,7 +436,12 @@
       color: #e6eef8;
     }
 
-    body.dark .cat:hover,
+    body.dark .cat:hover{
+      background-color: #ff6b6b;
+      color: white;
+      border-color: #ff6b6b;
+    }
+
     body.dark .btn:hover {
       background-color: #ff6b6b;
       color: white;
@@ -436,6 +458,6 @@
       color: #ff6b6b;
     }
 
-    body.dark .card img {
+    /*body.dark .card img {
       filter: brightness(0.85);
-    }
+    }*/

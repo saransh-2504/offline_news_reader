@@ -10,16 +10,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const categoryButtons = document.querySelectorAll(".cat");
   const offlineBanner = document.getElementById("offlineBanner");
 
-  // SIMPLE DARK MODE TOGGLE (no CSS variables)
-  const themeToggle = document.getElementById("themeToggle");
+  // DARK MODE TOGGLE
 
-  // Load saved mode
+  const themeToggle = document.getElementById("themeToggle");
   let saved = localStorage.getItem("themeMode");
   if (saved === "dark") {
     document.body.classList.add("dark");
     themeToggle.textContent = "☀️";
   }
-
   if (themeToggle) {
     themeToggle.style.cursor = "pointer";
     themeToggle.addEventListener("click", () => {
@@ -28,7 +26,6 @@ document.addEventListener("DOMContentLoaded", () => {
       localStorage.setItem("themeMode", isDark ? "dark" : "light");
     });
   }
-
 
   // INDEXEDDB (newsDB)
 
