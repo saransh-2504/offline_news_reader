@@ -399,6 +399,7 @@
       color: #fff;
     }
 
+<<<<<<< HEAD
     /* Loading Spinner */
     
     .loader {
@@ -416,3 +417,67 @@
         transform: rotate(360deg);
       }
     }
+=======
+    /* DARK MODE */
+
+    body.dark {
+      background-color: #0b1020;
+      color: #e6eef8;
+    }
+
+    body.dark header{
+      background-color: #0f1724;
+      color: #e6eef8;
+      border-color: #2b3440;
+    }
+
+    body.dark footer{
+      background-color: #0f1724;
+      color: #e6eef8;
+      border-color: #2b3440;
+    }
+
+    body.dark .auth-box{
+      background-color: #0f1724;
+      color: #e6eef8;
+      border-color: #2b3440;
+    }
+
+    body.dark .card {
+      background-color: #0f1724;
+      color: #e6eef8;
+      border-color: #2b3440;
+    }
+
+    body.dark .cat {
+      background: #1b2030;
+      border-color: #2b3440;
+      color: #e6eef8;
+    }
+
+    body.dark .cat:hover{
+      background-color: #ff6b6b;
+      color: white;
+      border-color: #ff6b6b;
+    }
+
+    body.dark .btn:hover {
+      background-color: #ff6b6b;
+      color: white;
+      border-color: #ff6b6b;
+    }
+
+    body.dark .btn {
+      background: transparent;
+      color: #e6eef8;
+      border-color: #2b3440;
+    }
+
+    body.dark .save-btn.saved {
+      color: #ff6b6b;
+    }
+
+    /*body.dark .card img {
+      filter: brightness(0.85);
+    }*/
+>>>>>>> 821c206e66ffc8dfc52308475eca4e336d0d860b

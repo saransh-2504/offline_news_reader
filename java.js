@@ -12,6 +12,22 @@ document.addEventListener("DOMContentLoaded", () => {
   const loader = document.getElementById("loader");
 
 
+  // DARK MODE TOGGLE
+
+  const themeToggle = document.getElementById("themeToggle");
+  let saved = localStorage.getItem("themeMode");
+  if (saved === "dark") {
+    document.body.classList.add("dark");
+    themeToggle.textContent = "☀️";
+  }
+  if (themeToggle) {
+    themeToggle.style.cursor = "pointer";
+    themeToggle.addEventListener("click", () => {
+      const isDark = document.body.classList.toggle("dark");
+      themeToggle.textContent = isDark ? "☀️" : "🌙";
+      localStorage.setItem("themeMode", isDark ? "dark" : "light");
+    });
+  }
 
   // INDEXEDDB (newsDB)
 

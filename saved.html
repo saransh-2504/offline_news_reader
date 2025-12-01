@@ -25,6 +25,15 @@
 
   <script>
     document.addEventListener("DOMContentLoaded", () => {
+      // APPLY DARK THEME 
+        try {
+          const saved = localStorage.getItem("themeMode");
+          if (saved === "dark") {
+            document.body.classList.add("dark");
+          } else {
+            document.body.classList.remove("dark");
+          }
+        } catch (e) {}
 
       let container = document.getElementById("savedList");
 
