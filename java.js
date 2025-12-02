@@ -261,13 +261,20 @@ document.addEventListener("DOMContentLoaded", () => {
         // If nothing displayed yet, render first batch
         // If this is the first load → show loader for 2 seconds
         if (totalDisplayed === 0) {
+          // Show loader for first batch
           loader.style.display = "block";
 
           setTimeout(() => {
             loader.style.display = "none";
-            renderNextBatch();    // show first 10
-          }, 2000);
+
+            // Render first 10 articles
+            renderNextBatch();
+
+            // Load second batch automatically
+            loadSecondBatch();
+          }, 1500);
         }
+
         // If we already showed the first batch, load next batch immediately
         else {
           renderNextBatch();
@@ -555,6 +562,29 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
 
+  // ------------------- LOAD SECOND BATCH AUTOMATICALLY -------------------
+  async function loadSecondBatch() {
+    // If offline → cannot fetch next batch
+    if (!navigator.onLine) return;
+
+    // If pool has less than 10 → fetch more
+    if (newsPool.length < BATCH_SIZE) {
+      await fetchAndCacheArticles();
+    }
+
+    // Show loader before second batch
+    loader.style.display = "block";
+
+    setTimeout(() => {
+      loader.style.display = "none";
+
+      // Render the next 10 articles
+      renderNextBatch();
+
+      
+    }, 1000);
+  }
+
 
   // ---- LOAD MORE BUTTON ----
   function showLoadMoreButton() {
@@ -574,7 +604,8 @@ document.addEventListener("DOMContentLoaded", () => {
       renderNextBatch();  // load next 10
     };
 
-    newsContainer.insertAdjacentElement("afterend", btn);
+    document.querySelector("footer").insertAdjacentElement("beforebegin", btn);
+
 
   }
 
