@@ -60,7 +60,10 @@
             card.className = "card";
 
             card.innerHTML = `
-          <img src="${item.img || 'https://via.placeholder.com/300'}" />
+          <img src="${item.img || 'https://via.placeholder.com/600x400.png?text=No+Image+Available'}"
+          alt="Saved Article Image"
+          onerror="this.onerror=null; this.src='https://via.placeholder.com/600x400.png?text=No+Image+Available';"/>
+
           <div class="content">
             <div class="tag">Saved</div>
             <div class="title-text">${item.title}</div>
@@ -69,8 +72,7 @@
               <span class="delete-btn" data-link="${item.link}">🗑 Delete</span>
               <a href="${item.link}" class="btn" target="_blank">Read More</a>
             </div>
-          </div>
-        `;
+          </div> `;
 
             container.appendChild(card);
           });

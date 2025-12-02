@@ -169,6 +169,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // GNEWS INFINITE SCROLL
 
+  // ---- BATCH SYSTEM VARIABLES ----
+  const BATCH_SIZE = 10;          // show 10 cards at a time
+  const AUTO_BATCH_LIMIT = 20;    // after 20 cards, show "Load More"
+  let totalDisplayed = 0;         // how many cards visible currently
+  let newsPool = [];              // all fetched articles stored temporarily
+  let loadMoreButtonShown = false;
+
   const API_KEY = ""; // --> api key 
   let currentCategory = "general";
   let searchText = "";
@@ -182,7 +189,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function buildApiURL() {
     const q = searchText || RANDOM_QUERIES[pageIndex % RANDOM_QUERIES.length];
-    return `https://gnews.io/api/v4/search?q=${encodeURIComponent(q)}&topic=${currentCategory}&lang=en&apikey=${API_KEY}`;
+    return `https://gnews.io/api/v4/search?q=${encodeURIComponent(q)}&topic=${currentCategory}&lang=en&page=${pageIndex}&apikey=${API_KEY}`;
+
   }
 
   async function loadNews() {
@@ -233,14 +241,41 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // Display articles
-        displayNews(data.articles.map(a => ({
+        // ---- STORE FETCHED ARTICLES INTO newsPool ----
+        const formatted = data.articles.map(a => ({
           title: a.title,
           description: a.description,
           link: a.url || a.link,
-          image: a.image || '',
-        })));
+          image: a.image || ''
+        }));
+
+        // avoid duplicates
+        formatted.forEach(item => {
+          if (!newsPool.find(x => x.link === item.link)) {
+            newsPool.push(item);
+          }
+        });
 
         pageIndex++;
+
+        // If nothing displayed yet, render first batch
+        // If this is the first load → show loader for 2 seconds
+        if (totalDisplayed === 0) {
+          loader.style.display = "block";
+
+          setTimeout(() => {
+            loader.style.display = "none";
+            renderNextBatch();    // show first 10
+          }, 2000);
+        }
+        // If we already showed the first batch, load next batch immediately
+        else {
+          renderNextBatch();
+
+        }
+
+
+
       } else {
         console.warn("No articles returned from GNews for URL:", url);
       }
@@ -266,10 +301,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const safeTitle = (article.title || "No title").replace(/"/g, '&quot;');
       const safeDesc = (article.description || "").replace(/"/g, '&quot;');
-      const safeImg = (article.image || '').replace(/"/g, '&quot;');
+      const safeImg = (article.image || "").replace(/"/g, '&quot;');
+
+      // SAFELY CLEAN IMAGE URL
+      let imgUrl = article.image;
+
+      // If image is not a valid string → replace it
+      if (!imgUrl || typeof imgUrl !== "string" || imgUrl.length < 5) {
+        imgUrl = "https://via.placeholder.com/600x400.png?text=No+Image+Available";
+      }
+
 
       card.innerHTML = `
-      <img src="${article.image || article.imageUrl || 'https://via.placeholder.com/300'}" alt="article image" />
+      <img 
+      src="${imgUrl}"
+      alt="Article Image"
+      onerror="this.onerror=null; this.src='https://via.placeholder.com/600x400.png?text=No+Image+Available';"
+    />
+
       <div class="content">
         <div class="tag">${currentCategory.toUpperCase()}</div>
         <div class="title-text">${article.title || ""}</div>
@@ -324,12 +373,29 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
       newsContainer.innerHTML = "";
-      displayNews(items.map(i => ({
+      newsPool = items.map(i => ({
         title: i.title,
         description: i.description,
         link: i.link,
         image: i.image
-      })));
+      }));
+
+      renderNextBatch();
+
+      if (newsPool.length === 0) {
+        showSyncButton();
+      }
+
+      function showSyncButton() {
+        const div = document.createElement("div");
+        div.innerText = "Sync with Internet";
+        div.style.textAlign = "center";
+        div.style.margin = "20px";
+        div.style.fontSize = "18px";
+        document.body.appendChild(div);
+      }
+
+
     };
 
     req.onerror = () => {
@@ -341,13 +407,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!offlineBanner) return;
     offlineBanner.style.display = show ? "block" : "none";
   }
-
-  // Infinite scroll trigger
-  window.addEventListener("scroll", () => {
-    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
-      loadNews();
-    }
-  });
 
   // Category click handler
   categoryButtons.forEach(btn => {
@@ -403,6 +462,122 @@ document.addEventListener("DOMContentLoaded", () => {
 
     }
   });
+
+
+  // ----- FETCH MORE ARTICLES FROM API AND STORE INTO newsPool -----
+  async function fetchAndCacheArticles() {
+    if (!API_KEY) return;
+
+    const url = buildApiURL();
+
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (!data.articles || !data.articles.length) return;
+
+      const formatted = data.articles.map(a => ({
+        title: a.title,
+        description: a.description,
+        link: a.url || a.link,
+        image: a.image || ""
+      }));
+
+      // push only unique items
+      formatted.forEach(item => {
+        if (!newsPool.find(x => x.link === item.link)) {
+          newsPool.push(item);
+        }
+      });
+
+      // also cache in IndexedDB
+      try {
+        const tx = db.transaction("articles", "readwrite");
+        const store = tx.objectStore("articles");
+        formatted.forEach(a => {
+          store.put({
+            title: a.title,
+            description: a.description,
+            link: a.link,
+            image: a.image,
+            publishedAt: new Date().toISOString()
+          });
+        });
+      } catch (e) {
+        console.warn("Failed to write to DB:", e);
+      }
+
+      pageIndex++;
+
+    } catch (err) {
+      console.error("fetchAndCacheArticles error:", err);
+    }
+  }
+
+
+  // ---- RENDER NEXT 10 CARDS ----
+  function renderNextBatch() {
+
+    // If pool has less than 10 items, fetch more FIRST
+    if (newsPool.length < BATCH_SIZE && navigator.onLine) {
+      fetchMoreBeforeBatch().then(() => {
+        actuallyRenderBatch();
+      });
+      return;
+    }
+
+    // Otherwise render normally
+    actuallyRenderBatch();
+  }
+
+  // Fetch more articles BEFORE rendering next batch
+  function fetchMoreBeforeBatch() {
+    return new Promise(async (resolve) => {
+      await fetchAndCacheArticles();   // existing function you already have
+      resolve();
+    });
+  }
+
+  // Actual rendering logic separated so we can call it after fetch
+  function actuallyRenderBatch() {
+    const slice = newsPool.splice(0, BATCH_SIZE);
+
+    if (!slice.length) return;
+
+    displayNews(slice);
+    totalDisplayed += slice.length;
+
+    // After showing 20 → show Load More
+    if (totalDisplayed >= AUTO_BATCH_LIMIT && !loadMoreButtonShown) {
+      showLoadMoreButton();
+      loadMoreButtonShown = true;
+    }
+  }
+
+
+
+  // ---- LOAD MORE BUTTON ----
+  function showLoadMoreButton() {
+    const btn = document.createElement("a");
+    btn.id = "loadMoreButton";
+    btn.href = "#";
+    btn.innerText = "Load More";
+    btn.style.display = "block";
+    btn.style.textAlign = "center";
+    btn.style.margin = "20px auto";
+    btn.style.fontSize = "18px";
+    btn.style.cursor = "pointer";
+    btn.classList.add("btn");
+
+    btn.onclick = (e) => {
+      e.preventDefault();
+      renderNextBatch();  // load next 10
+    };
+
+    newsContainer.insertAdjacentElement("afterend", btn);
+
+  }
+
 
   window.addEventListener("online", () => {
     showOfflineBanner(false);
