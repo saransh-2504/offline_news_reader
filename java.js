@@ -50,6 +50,10 @@ document.addEventListener("DOMContentLoaded", () => {
   openReq.onsuccess = (e) => {
     db = e.target.result;
     console.log("IndexedDB ready");
+    const loggedUser = localStorage.getItem("loggedUser");  
+    if (loggedUser) {
+      loadNews();
+    }
   };
 
   openReq.onerror = (e) => {
@@ -107,6 +111,8 @@ document.addEventListener("DOMContentLoaded", () => {
       greetUser.innerText = "Welcome, " + user.first + "!";
       authOverlay.style.display = "none";
       document.body.classList.remove("blur");
+      loadNews();
+
 
     } catch (err) {
       console.error("Signup error:", err);
@@ -130,6 +136,8 @@ document.addEventListener("DOMContentLoaded", () => {
         greetUser.innerText = "WELCOME, " + user.first + "!";
         authOverlay.style.display = "none";
         document.body.classList.remove("blur");
+        loadNews();
+
       } else {
         alert("Incorrect email or password.");
       }
@@ -176,7 +184,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let newsPool = [];              // all fetched articles stored temporarily
   let loadMoreButtonShown = false;
 
-  const API_KEY = ""; // --> api key 
+  const API_KEY = "01f34776ac18f47af61d0c44277a190d"; // --> api key 
   let currentCategory = "general";
   let searchText = "";
   let pageIndex = 0;
@@ -338,6 +346,7 @@ document.addEventListener("DOMContentLoaded", () => {
       `;
 
       newsContainer.appendChild(card);
+      saveCurrentlyVisibleArticles();
 
       (function markSavedIfNeeded() {
         if (!db) return;
@@ -361,6 +370,23 @@ document.addEventListener("DOMContentLoaded", () => {
       })();
     });
   }
+
+  function saveCurrentlyVisibleArticles() {
+    const cards = document.querySelectorAll(".card");
+
+    const list = [];
+    cards.forEach(card => {
+      const title = card.querySelector(".title-text")?.innerText || "";
+      const desc = card.querySelector(".desc")?.innerText || "";
+      const img = card.querySelector("img")?.src || "";
+      const link = card.querySelector("a.btn")?.href || "";
+
+      list.push({ title, desc, img, link });
+    });
+
+    localStorage.setItem("lastVisibleArticles", JSON.stringify(list));
+  }
+
 
   // Load articles from saved section
   function loadFromDBArticles() {
@@ -581,7 +607,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Render the next 10 articles
       renderNextBatch();
 
-      
+
     }, 1000);
   }
 
@@ -607,23 +633,53 @@ document.addEventListener("DOMContentLoaded", () => {
 
   window.addEventListener("online", () => {
     showOfflineBanner(false);
+
+    const btn = document.getElementById("loadMoreButton");
+    const loadMore = document.getElementById("loadMoreButton");
+    if (loadMore) {
+      loadMore.innerText = "Load More";
+      loadMore.classList.add("load-more-link");
+      loadMore.classList.remove("sync-link");
+      loadMore.onclick = (e) => {
+        e.preventDefault();
+        renderNextBatch();
+      };
+    }
+
+
+    // Fetch newest articles again
     newsContainer.innerHTML = "";
     pageIndex = 0;
+    newsPool = [];
+    totalDisplayed = 0;
+    loadMoreButtonShown = false;
+
     loadNews();
   });
 
+
   window.addEventListener("offline", () => {
     showOfflineBanner(true);
-    loadFromDBArticles();
-  });
 
-  setTimeout(() => {
-    if (!navigator.onLine) {
-      showOfflineBanner(true);
-      loadFromDBArticles();
-    } else {
-      loadNews();
+    const stored = JSON.parse(localStorage.getItem("lastVisibleArticles") || "[]");
+    newsContainer.innerHTML = "";
+
+    if (stored.length) {
+      stored.forEach(a => {
+        displayNews([a]);
+      });
     }
-  }, 300);
 
+    // Change Load More button to "Sync with Internet"
+    const loadMore = document.getElementById("loadMoreButton");
+    if (loadMore) {
+      loadMore.innerText = "Sync with Internet";
+      loadMore.classList.remove("load-more-link");
+      loadMore.classList.add("sync-link");  // optional new style
+      loadMore.onclick = (e) => {
+        e.preventDefault();
+        alert("Internet required to sync new articles!");
+      };
+    }
+  });
 });
