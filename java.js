@@ -592,12 +592,7 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.id = "loadMoreButton";
     btn.href = "#";
     btn.innerText = "Load More";
-    btn.style.display = "block";
-    btn.style.textAlign = "center";
-    btn.style.margin = "20px auto";
-    btn.style.fontSize = "18px";
-    btn.style.cursor = "pointer";
-    btn.classList.add("btn");
+    btn.classList.add("load-more-link");
 
     btn.onclick = (e) => {
       e.preventDefault();

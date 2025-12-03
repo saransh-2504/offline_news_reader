@@ -1103,12 +1103,12 @@
       }
 
       .logout-btn {
-        font-size: 13px ;
-        padding: 4px 8px ;
+        font-size: 13px;
+        padding: 4px 8px;
       }
 
       #greetUser {
-        font-size: 12px ;
+        font-size: 12px;
       }
 
       .title {
@@ -1277,4 +1277,20 @@
         font-size: 32px;
         line-height: 1.2;
       }
+    }
+
+    /* Simple Load More link */
+    .load-more-link {
+      display: block;
+      text-decoration: none;
+      text-align: center;
+      margin: 25px auto;
+      font-size: 28px;
+      font-family: 'Lora', serif;
+      color: #000;
+      cursor: pointer;
+    }
+
+    .load-more-link:hover {
+      color: #b30000;
     }
