@@ -34,9 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let db;
   const DB_VERSION = 2;
   const DB_NAME = "newsDB";
-
   const openReq = indexedDB.open(DB_NAME, DB_VERSION);
-
   openReq.onupgradeneeded = (e) => {
     db = e.target.result;
     if (!db.objectStoreNames.contains("articles")) {
@@ -50,9 +48,34 @@ document.addEventListener("DOMContentLoaded", () => {
   openReq.onsuccess = (e) => {
     db = e.target.result;
     console.log("IndexedDB ready");
-    const loggedUser = localStorage.getItem("loggedUser");  
+
+    // offline launch 
+    if (!navigator.onLine) {
+      const stored = JSON.parse(localStorage.getItem("lastVisibleArticles") || "[]");
+      const loggedUser = localStorage.getItem("loggedUser");
+
+      if (loggedUser) {
+        authOverlay.style.display = "none";
+        document.body.classList.remove("blur");
+        if (stored.length) {
+          newsContainer.innerHTML = "";
+          stored.forEach(a => displayNews([a]));
+        }
+        console.log("Offline launch → restored last visible articles");
+        return;
+      }
+      console.log("Offline launch without login → waiting for user login");
+      return;
+    }
+
+    const loggedUser = localStorage.getItem("loggedUser");
     if (loggedUser) {
-      loadNews();
+      if (!navigator.onLine) {
+        loadFromDBArticles();
+      }
+      else {
+        loadNews();
+      }
     }
   };
 
@@ -61,13 +84,22 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   //signup, login, logout, forgot
-
   document.body.classList.add("blur");
-
   const storedUser = JSON.parse(localStorage.getItem("userData") || "null");
   const loggedUser = localStorage.getItem("loggedUser");
+  if (!navigator.onLine && loggedUser) {
+    authOverlay.style.display = "none";
+    document.body.classList.remove("blur");
+    const storedArticles = JSON.parse(localStorage.getItem("lastVisibleArticles") || "[]");
+    if (storedArticles.length) {
+      newsContainer.innerHTML = "";
+      storedArticles.forEach(a => displayNews([a]));
+    }
+    console.log("Offline launch/login → showing last visible articles");
+    return;
+  }
 
-  if (loggedUser && storedUser) {
+  if (navigator.onLine && loggedUser && storedUser) {
     greetUser.innerText = "Welcome, " + storedUser.first + "!";
     authOverlay.style.display = "none";
     document.body.classList.remove("blur");
@@ -136,12 +168,21 @@ document.addEventListener("DOMContentLoaded", () => {
         greetUser.innerText = "WELCOME, " + user.first + "!";
         authOverlay.style.display = "none";
         document.body.classList.remove("blur");
+        if (!navigator.onLine) {
+          const stored = JSON.parse(localStorage.getItem("lastVisibleArticles") || "[]");
+          newsContainer.innerHTML = "";
+          if (stored.length) {
+            stored.forEach(a => displayNews([a]));
+          }
+          return;
+        }
         loadNews();
-
-      } else {
+      }
+      else {
         alert("Incorrect email or password.");
       }
-    } catch (err) {
+    } 
+    catch (err) {
       console.error("Login error:", err);
       alert("An error occurred during login.");
     }
@@ -157,12 +198,12 @@ document.addEventListener("DOMContentLoaded", () => {
         alert("Email not found!");
         return;
       }
-
       user.password = newPass;
       localStorage.setItem("userData", JSON.stringify(user));
       alert("Password reset successful!");
       showLogin();
-    } catch (err) {
+    } 
+    catch (err) {
       console.error("Reset error:", err);
       alert("An error occurred.");
     }
@@ -176,15 +217,13 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   // GNEWS INFINITE SCROLL
-
-  // ---- BATCH SYSTEM VARIABLES ----
-  const BATCH_SIZE = 10;          // show 10 cards at a time
-  const AUTO_BATCH_LIMIT = 20;    // after 20 cards, show "Load More"
-  let totalDisplayed = 0;         // how many cards visible currently
-  let newsPool = [];              // all fetched articles stored temporarily
+  const BATCH_SIZE = 10;         
+  const AUTO_BATCH_LIMIT = 20;    
+  let totalDisplayed = 0;        
+  let newsPool = [];        
   let loadMoreButtonShown = false;
 
-  const API_KEY = "01f34776ac18f47af61d0c44277a190d"; // --> api key 
+  const API_KEY = ""; //                            --> API KEY 
   let currentCategory = "general";
   let searchText = "";
   let pageIndex = 0;
@@ -226,30 +265,30 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const res = await fetch(url);
       const data = await res.json();
-
       if (data && data.articles && data.articles.length) {
 
         // Save articles into saved section
         try {
           const tx = db.transaction("articles", "readwrite");
           const store = tx.objectStore("articles");
-          data.articles.forEach(a => {
+          data.articles.forEach(async (a) => {
+            const base64Img = await convertImageToBase64(a.image);
             const articleObj = {
               title: a.title || "",
               description: a.description || "",
               url: a.url || a.link || "",
-              image: a.image || "",
+              image: base64Img,
               publishedAt: a.publishedAt || a.pubDate || ""
             };
             articleObj.link = articleObj.url;
             store.put(articleObj);
           });
-        } catch (err) {
+        } 
+        catch (err) {
           console.warn("Could not write to DB articles store:", err);
         }
 
         // Display articles
-        // ---- STORE FETCHED ARTICLES INTO newsPool ----
         const formatted = data.articles.map(a => ({
           title: a.title,
           description: a.description,
@@ -263,43 +302,30 @@ document.addEventListener("DOMContentLoaded", () => {
             newsPool.push(item);
           }
         });
-
         pageIndex++;
 
-        // If nothing displayed yet, render first batch
-        // If this is the first load → show loader for 2 seconds
         if (totalDisplayed === 0) {
-          // Show loader for first batch
           loader.style.display = "block";
-
           setTimeout(() => {
             loader.style.display = "none";
-
-            // Render first 10 articles
             renderNextBatch();
-
-            // Load second batch automatically
             loadSecondBatch();
           }, 1500);
         }
-
-        // If we already showed the first batch, load next batch immediately
         else {
           renderNextBatch();
-
         }
-
-
-
-      } else {
+      } 
+      else {
         console.warn("No articles returned from GNews for URL:", url);
       }
-    } catch (err) {
+    } 
+    catch (err) {
       console.error("GNews fetch error:", err);
-    } finally {
+    } 
+    finally {
       isLoading = false;
       loader.style.display = "none";
-
     }
   }
   function displayNews(articles) {
@@ -318,22 +344,19 @@ document.addEventListener("DOMContentLoaded", () => {
       const safeDesc = (article.description || "").replace(/"/g, '&quot;');
       const safeImg = (article.image || "").replace(/"/g, '&quot;');
 
-      // SAFELY CLEAN IMAGE URL
+      // CLEAN IMAGE URL
       let imgUrl = article.image;
+      if (!navigator.onLine && !imgUrl.startsWith("data:image")) {
+        imgUrl = "https://via.placeholder.com/600x400.png?text=No+Image+Available";
+      }
 
-      // If image is not a valid string → replace it
+      // Iif image is not available then replace it 
       if (!imgUrl || typeof imgUrl !== "string" || imgUrl.length < 5) {
         imgUrl = "https://via.placeholder.com/600x400.png?text=No+Image+Available";
       }
 
-
-      card.innerHTML = `
-      <img 
-      src="${imgUrl}"
-      alt="Article Image"
-      onerror="this.onerror=null; this.src='https://via.placeholder.com/600x400.png?text=No+Image+Available';"
-    />
-
+      card.innerHTML = `<img src="${imgUrl}" alt="Article Image"
+      onerror="this.onerror=null; this.src='https://via.placeholder.com/600x400.png?text=No+Image+Available';"/>
       <div class="content">
         <div class="tag">${currentCategory.toUpperCase()}</div>
         <div class="title-text">${article.title || ""}</div>
@@ -342,14 +365,15 @@ document.addEventListener("DOMContentLoaded", () => {
         <span class="save-btn" data-link="${article.link}" data-title="${safeTitle}" data-img="${safeImg}" data-desc="${safeDesc}">🤍 Save</span>
         <a href="${article.link}" class="btn" target="_blank" rel="noopener">Read More</a>
         </div>
-      </div>
-      `;
+      </div>`;
 
       newsContainer.appendChild(card);
       saveCurrentlyVisibleArticles();
 
       (function markSavedIfNeeded() {
-        if (!db) return;
+        if (!db) {
+          return
+        }
         try {
           const link = article.link;
           const tx = db.transaction("saved", "readonly");
@@ -364,29 +388,41 @@ document.addEventListener("DOMContentLoaded", () => {
               }
             }
           };
-        } catch (err) {
+        } 
+        catch (err) {
           console.warn("Could not check saved state:", err);
         }
-      })();
+      });
     });
   }
 
   function saveCurrentlyVisibleArticles() {
     const cards = document.querySelectorAll(".card");
-
     const list = [];
     cards.forEach(card => {
       const title = card.querySelector(".title-text")?.innerText || "";
       const desc = card.querySelector(".desc")?.innerText || "";
       const img = card.querySelector("img")?.src || "";
       const link = card.querySelector("a.btn")?.href || "";
-
       list.push({ title, desc, img, link });
     });
 
     localStorage.setItem("lastVisibleArticles", JSON.stringify(list));
   }
 
+  function searchOffline(keyword) {
+    const stored = JSON.parse(localStorage.getItem("lastVisibleArticles") || "[]");
+    if (!stored.length) {
+      return
+    }
+    const lower = keyword.toLowerCase();
+    const results = stored.filter(a =>
+      a.title.toLowerCase().includes(lower) ||
+      a.desc.toLowerCase().includes(lower)
+    );
+    newsContainer.innerHTML = "";
+    results.forEach(a => displayNews([a]));
+  }
 
   // Load articles from saved section
   function loadFromDBArticles() {
@@ -427,10 +463,7 @@ document.addEventListener("DOMContentLoaded", () => {
         div.style.fontSize = "18px";
         document.body.appendChild(div);
       }
-
-
     };
-
     req.onerror = () => {
       newsContainer.innerHTML = "<h3>Could not load cached articles.</h3>";
     };
@@ -446,7 +479,6 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.addEventListener("click", () => {
       categoryButtons.forEach(b => b.classList.remove("active-cat"));
       btn.classList.add("active-cat");
-
       currentCategory = btn.dataset.category || "general";
       newsContainer.innerHTML = "";
       pageIndex = 0;
@@ -458,12 +490,18 @@ document.addEventListener("DOMContentLoaded", () => {
   let searchTimer;
   searchInput.addEventListener("input", () => {
     clearTimeout(searchTimer);
+
     searchTimer = setTimeout(() => {
-      searchText = searchInput.value.trim();
+      const keyword = searchInput.value.trim();
+      if (!navigator.onLine) {
+        searchOffline(keyword);
+        return;
+      }
+      searchText = keyword;
       newsContainer.innerHTML = "";
       pageIndex = 0;
       loadNews();
-    }, 1500);
+    }, 400); 
   });
 
   // Save article into saved store
@@ -473,42 +511,36 @@ document.addEventListener("DOMContentLoaded", () => {
       const title = e.target.dataset.title || "Untitled";
       const img = e.target.dataset.img || "";
       const desc = e.target.dataset.desc || "";
-
       if (!db) {
         alert("Local DB not ready. Try again in a moment.");
         return;
       }
-
       const tx = db.transaction("saved", "readwrite");
       const store = tx.objectStore("saved");
       const article = { link, title, img, desc };
-
       const putReq = store.put(article);
       putReq.onsuccess = () => {
         e.target.classList.add("saved");
         e.target.innerHTML = '❤️ Saved';
-        // alert("Saved offline! ❤️");
       };
       putReq.onerror = () => {
         alert("Could not save article.");
       };
-
     }
   });
 
-
-  // ----- FETCH MORE ARTICLES FROM API AND STORE INTO newsPool -----
+  // fetch more articles and store
   async function fetchAndCacheArticles() {
-    if (!API_KEY) return;
-
+    if (!API_KEY) {
+      return
+    }
     const url = buildApiURL();
-
     try {
       const res = await fetch(url);
       const data = await res.json();
-
-      if (!data.articles || !data.articles.length) return;
-
+      if (!data.articles || !data.articles.length) {
+        return
+      }
       const formatted = data.articles.map(a => ({
         title: a.title,
         description: a.description,
@@ -523,7 +555,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
 
-      // also cache in IndexedDB
+      // cache in IndexedDB
       try {
         const tx = db.transaction("articles", "readwrite");
         const store = tx.objectStore("articles");
@@ -536,51 +568,43 @@ document.addEventListener("DOMContentLoaded", () => {
             publishedAt: new Date().toISOString()
           });
         });
-      } catch (e) {
+      } 
+      catch (e) {
         console.warn("Failed to write to DB:", e);
       }
-
       pageIndex++;
-
-    } catch (err) {
+    } 
+    catch (err) {
       console.error("fetchAndCacheArticles error:", err);
     }
   }
 
-
-  // ---- RENDER NEXT 10 CARDS ----
+  // take next 10 cards
   function renderNextBatch() {
-
-    // If pool has less than 10 items, fetch more FIRST
     if (newsPool.length < BATCH_SIZE && navigator.onLine) {
       fetchMoreBeforeBatch().then(() => {
         actuallyRenderBatch();
       });
       return;
     }
-
-    // Otherwise render normally
     actuallyRenderBatch();
   }
-
-  // Fetch more articles BEFORE rendering next batch
   function fetchMoreBeforeBatch() {
     return new Promise(async (resolve) => {
-      await fetchAndCacheArticles();   // existing function you already have
+      await fetchAndCacheArticles(); 
       resolve();
     });
   }
 
-  // Actual rendering logic separated so we can call it after fetch
   function actuallyRenderBatch() {
     const slice = newsPool.splice(0, BATCH_SIZE);
-
-    if (!slice.length) return;
-
+    if (!slice.length) {
+      return
+    }
     displayNews(slice);
     totalDisplayed += slice.length;
 
-    // After showing 20 → show Load More
+    // load more
     if (totalDisplayed >= AUTO_BATCH_LIMIT && !loadMoreButtonShown) {
       showLoadMoreButton();
       loadMoreButtonShown = true;
@@ -588,29 +612,18 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
 
-  // ------------------- LOAD SECOND BATCH AUTOMATICALLY -------------------
+  // second batch calling
   async function loadSecondBatch() {
-    // If offline → cannot fetch next batch
     if (!navigator.onLine) return;
-
-    // If pool has less than 10 → fetch more
     if (newsPool.length < BATCH_SIZE) {
       await fetchAndCacheArticles();
     }
-
-    // Show loader before second batch
     loader.style.display = "block";
-
     setTimeout(() => {
       loader.style.display = "none";
-
-      // Render the next 10 articles
       renderNextBatch();
-
-
     }, 1000);
   }
-
 
   // ---- LOAD MORE BUTTON ----
   function showLoadMoreButton() {
@@ -619,21 +632,15 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.href = "#";
     btn.innerText = "Load More";
     btn.classList.add("load-more-link");
-
     btn.onclick = (e) => {
       e.preventDefault();
-      renderNextBatch();  // load next 10
+      renderNextBatch(); 
     };
-
     document.querySelector("footer").insertAdjacentElement("beforebegin", btn);
-
-
   }
-
 
   window.addEventListener("online", () => {
     showOfflineBanner(false);
-
     const btn = document.getElementById("loadMoreButton");
     const loadMore = document.getElementById("loadMoreButton");
     if (loadMore) {
@@ -646,40 +653,35 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     }
 
-
-    // Fetch newest articles again
+    // Fetch new articles
     newsContainer.innerHTML = "";
     pageIndex = 0;
     newsPool = [];
     totalDisplayed = 0;
     loadMoreButtonShown = false;
-
     loadNews();
   });
-
 
   window.addEventListener("offline", () => {
     showOfflineBanner(true);
 
-    const stored = JSON.parse(localStorage.getItem("lastVisibleArticles") || "[]");
-    newsContainer.innerHTML = "";
-
-    if (stored.length) {
-      stored.forEach(a => {
-        displayNews([a]);
-      });
-    }
-
-    // Change Load More button to "Sync with Internet"
+    // Sync with Internet
     const loadMore = document.getElementById("loadMoreButton");
     if (loadMore) {
       loadMore.innerText = "Sync with Internet";
       loadMore.classList.remove("load-more-link");
-      loadMore.classList.add("sync-link");  // optional new style
+      loadMore.classList.add("sync-link");  
       loadMore.onclick = (e) => {
         e.preventDefault();
         alert("Internet required to sync new articles!");
       };
+      setTimeout(() => {
+        if (!navigator.onLine) {
+          showOfflineBanner(true);
+        } else {
+          loadNews();
+        }
+      }, 300);
     }
   });
 });
