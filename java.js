@@ -223,7 +223,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let newsPool = [];        
   let loadMoreButtonShown = false;
 
-  const API_KEY = ""; //                            --> API KEY 
+  const API_KEY = "994ad92756a3d2e963f645d08c268201"; //                            --> API KEY 
   let currentCategory = "general";
   let searchText = "";
   let pageIndex = 0;
