@@ -1293,12 +1293,12 @@
       margin: 25px auto;
       font-size: 28px;
       font-family: 'Lora', serif;
-      color: #000;
+      color: #ff2525;
       cursor: pointer;
     }
 
     .load-more-link:hover {
-      color: #b30000;
+      color: #0218e0;
     }
 
     .sync-link {
