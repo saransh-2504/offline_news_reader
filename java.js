@@ -473,20 +473,37 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function convertImageToBase64(url) {
-    if (!url) return "";
-    try {
-        const res = await fetch(url);
-        const blob = await res.blob();
-        return await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.readAsDataURL(blob);
-        });
-    } catch (err) {
-        console.warn("Base64 conversion failed:", err);
-        return "";
+        if (!url || typeof url !== "string" || url.trim().length < 5) return "";
+        
+        try {
+            // Add timeout to prevent hanging
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+            
+            const res = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            
+            if (!res.ok) return "";
+            
+            const blob = await res.blob();
+            
+            // Check if blob is actually an image
+            if (!blob.type.startsWith('image/')) {
+                console.warn("Not an image:", url);
+                return "";
+            }
+            
+            return await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = () => resolve("");
+                reader.readAsDataURL(blob);
+            });
+        } catch (err) {
+            console.warn("Base64 conversion failed:", err.message);
+            return "";
+        }
     }
-}
 
     // DISPLAY NEWS CARDS - Creates HTML cards for each article
     function displayNews(articles) {
@@ -506,22 +523,25 @@ document.addEventListener("DOMContentLoaded", () => {
             const safeDesc = (article.description || "").replace(/"/g, '&quot;');
             const safeImg = (article.image || "").replace(/"/g, '&quot;');
 
-            // Handle image URL
+            // Handle image URL with better fallback
             let imgUrl = article.image;
             
+            // Default placeholder image
+            const placeholderImg = "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=600&h=400&fit=crop&q=80";
+            
+            // Check if image URL is valid
+            if (!imgUrl || typeof imgUrl !== "string" || imgUrl.trim().length < 5) {
+                imgUrl = placeholderImg;
+            }
+            
             // If offline and image is not base64, use placeholder
-            if (!navigator.onLine && !imgUrl.startsWith("data:image")) {
-                imgUrl = "https://via.placeholder.com/600x400.png?text=No+Image+Available";
+            if (!navigator.onLine && imgUrl && !imgUrl.startsWith("data:image")) {
+                imgUrl = placeholderImg;
             }
 
-            // If no image, use placeholder
-            if (!imgUrl || typeof imgUrl !== "string" || imgUrl.length < 5) {
-                imgUrl = "https://via.placeholder.com/600x400.png?text=No+Image+Available";
-            }
-
-            // Create card HTML
+            // Create card HTML with better error handling
             card.innerHTML = `<img src="${imgUrl}" alt="Article Image"
-      onerror="this.onerror=null; this.src='https://via.placeholder.com/600x400.png?text=No+Image+Available';"/>
+      onerror="this.onerror=null; this.src='${placeholderImg}';"/>
       <div class="content">
         <div class="tag">${currentCategory.toUpperCase()}</div>
         <div class="title-text">${article.title || ""}</div>
