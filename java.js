@@ -69,7 +69,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // When database is successfully opened
     openReq.onsuccess = (e) => {
         db = e.target.result;
-        console.log("IndexedDB ready");
         
         // Fix articles with undefined category
         fixUndefinedCategories();
@@ -104,9 +103,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             });
             
-            if (fixed > 0) {
-                console.log(`Fixed ${fixed} articles with undefined category`);
-            }
+
         };
     }
 
@@ -429,7 +426,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function loadNews() {
         if (!navigator.onLine) {
-            console.log("Loading articles from IndexedDB (offline)");
             loadFromDBArticles();
             return;
         }
@@ -488,10 +484,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             category: category
                         };
                         store.put(articleObj);
-                        console.log("✓ Saved [" + category + "]:", articleObj.title?.substring(0, 30));
                     });
-                    
-                    console.log("All articles saved to IndexedDB");
                 }
                 catch (err) {
                     console.warn("Could not write to DB articles store:", err);
@@ -540,7 +533,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function convertImageToBase64(url) {
         if (!url || typeof url !== "string" || url.trim().length < 5) {
-            console.warn("Invalid image URL:", url);
             return "";
         }
         
@@ -556,7 +548,6 @@ document.addEventListener("DOMContentLoaded", () => {
             clearTimeout(timeoutId);
             
             if (!res.ok) {
-                console.warn("Fetch failed for:", url, "Status:", res.status);
                 return "";
             }
             
@@ -564,24 +555,18 @@ document.addEventListener("DOMContentLoaded", () => {
             
             // Check if blob is actually an image
             if (!blob.type.startsWith('image/')) {
-                console.warn("Not an image:", url, "Type:", blob.type);
                 return "";
             }
             
             const base64 = await new Promise((resolve) => {
                 const reader = new FileReader();
                 reader.onloadend = () => resolve(reader.result);
-                reader.onerror = () => {
-                    console.warn("FileReader error for:", url);
-                    resolve("");
-                };
+                reader.onerror = () => resolve("");
                 reader.readAsDataURL(blob);
             });
             
-            console.log("✓ Converted to base64:", url.substring(0, 50), "Size:", base64.length);
             return base64;
         } catch (err) {
-            console.warn("Base64 conversion failed for:", url, "Error:", err.message);
             return "";
         }
     }
@@ -699,8 +684,6 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        console.log("Loading from IndexedDB, category:", currentCategory);
-
         const tx = db.transaction("articles", "readonly");
         const store = tx.objectStore("articles");
         const req = store.getAll();
@@ -708,25 +691,9 @@ document.addEventListener("DOMContentLoaded", () => {
         req.onsuccess = () => {
             let items = req.result || [];
             
-            console.log("Total articles in DB:", items.length);
-            console.log("Current category:", currentCategory);
-            
-            // Log all categories in DB
-            const categories = [...new Set(items.map(i => i.category))];
-            console.log("Categories in DB:", categories);
-            console.log("Articles per category:", categories.map(cat => ({
-                category: cat,
-                count: items.filter(i => i.category === cat).length
-            })));
-            
             // Filter by category if not "general"
             if (currentCategory && currentCategory !== "general") {
-                const beforeFilter = items.length;
-                items = items.filter(item => {
-                    console.log("Checking article:", item.title?.substring(0, 20), "Category:", item.category, "Match:", item.category === currentCategory);
-                    return item.category === currentCategory;
-                });
-                console.log(`Filtered ${beforeFilter} articles to ${items.length} for category: ${currentCategory}`);
+                items = items.filter(item => item.category === currentCategory);
             }
             
             if (!items.length) {
@@ -740,16 +707,12 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             
             newsContainer.innerHTML = "";
-            newsPool = items.map(i => {
-                const hasBase64 = i.image && i.image.startsWith("data:image");
-                console.log("Article:", i.title?.substring(0, 30), "Has base64:", hasBase64);
-                return {
-                    title: i.title,
-                    description: i.description,
-                    link: i.link,
-                    image: i.image
-                };
-            });
+            newsPool = items.map(i => ({
+                title: i.title,
+                description: i.description,
+                link: i.link,
+                image: i.image
+            }));
 
             renderNextBatch();
 
@@ -777,7 +740,6 @@ document.addEventListener("DOMContentLoaded", () => {
         btn.addEventListener("click", () => {
             setActiveCategoryButton(btn.dataset.category || "general");
             currentCategory = btn.dataset.category || "general";
-            console.log("Category clicked:", currentCategory);
             
             // Reset everything for new category
             newsContainer.innerHTML = "";

@@ -13,26 +13,20 @@ const STATIC_CACHE_URLS = [
 
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
-  console.log('Service Worker: Installing...');
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Service Worker: Caching static files');
-        return cache.addAll(STATIC_CACHE_URLS);
-      })
+      .then((cache) => cache.addAll(STATIC_CACHE_URLS))
       .then(() => self.skipWaiting())
   );
 });
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker: Activating...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE) {
-            console.log('Service Worker: Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -73,7 +67,6 @@ async function cacheFirst(request) {
   const cached = await cache.match(request);
   
   if (cached) {
-    console.log('Service Worker: Serving from cache:', request.url);
     return cached;
   }
 
@@ -84,13 +77,10 @@ async function cacheFirst(request) {
     if (response && response.status === 200) {
       const responseClone = response.clone();
       cache.put(request, responseClone);
-      console.log('Service Worker: Cached new resource:', request.url);
     }
     
     return response;
   } catch (error) {
-    console.log('Service Worker: Fetch failed, no cache available:', request.url);
-    
     // Return placeholder for images
     if (request.destination === 'image') {
       return new Response(
