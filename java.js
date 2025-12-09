@@ -369,11 +369,8 @@ document.addEventListener("DOMContentLoaded", () => {
     async function loadNews() {
         if (!navigator.onLine) {
             console.log("Loading articles from IndexedDB (offline)");
-            showOfflineBanner(true);
             loadFromDBArticles();
             return;
-        } else {
-            showOfflineBanner(false);
         }
 
         if (isLoading) return;
@@ -412,32 +409,38 @@ document.addEventListener("DOMContentLoaded", () => {
             if (data && data.articles && data.articles.length) {
 
                 // Save articles into IndexedDB with base64 images
-                try {
-                    const tx = db.transaction("articles", "readwrite");
-                    const store = tx.objectStore("articles");
-                    
-                    // Use Promise.all to wait for all images to convert
-                    const savePromises = data.articles.map(async (a) => {
-                        const base64Img = await convertImageToBase64(a.image);
-                        const articleObj = {
-                            title: a.title || "",
-                            description: a.description || "",
-                            url: a.url || a.link || "",
-                            image: base64Img || a.image, // Use base64 if available, fallback to URL
-                            publishedAt: a.publishedAt || a.pubDate || "",
-                            category: currentCategory // Store category for offline filtering
-                        };
-                        articleObj.link = articleObj.url;
-                        return store.put(articleObj);
-                    });
-                    
-                    // Wait for all articles to be saved
-                    await Promise.all(savePromises);
-                    console.log("All articles saved to IndexedDB with images");
-                }
-                catch (err) {
-                    console.warn("Could not write to DB articles store:", err);
-                }
+                (async () => {
+                    try {
+                        const tx = db.transaction("articles", "readwrite");
+                        const store = tx.objectStore("articles");
+                        
+                        // Convert and save each article with base64 image
+                        for (const a of data.articles) {
+                            const base64Img = await convertImageToBase64(a.image);
+                            const articleObj = {
+                                title: a.title || "",
+                                description: a.description || "",
+                                url: a.url || a.link || "",
+                                image: base64Img || a.image, // Use base64 if available, fallback to URL
+                                publishedAt: a.publishedAt || a.pubDate || "",
+                                category: currentCategory // Store category for offline filtering
+                            };
+                            articleObj.link = articleObj.url;
+                            store.put(articleObj);
+                            
+                            if (base64Img) {
+                                console.log("✓ Saved with base64:", a.title?.substring(0, 30));
+                            } else {
+                                console.warn("✗ No base64 for:", a.title?.substring(0, 30));
+                            }
+                        }
+                        
+                        console.log("All articles saved to IndexedDB");
+                    }
+                    catch (err) {
+                        console.warn("Could not write to DB articles store:", err);
+                    }
+                })();
 
                 // Display articles (use online URLs for now, base64 will be used when offline)
                 const formatted = data.articles.map(a => ({
@@ -538,37 +541,22 @@ document.addEventListener("DOMContentLoaded", () => {
             const placeholderImg = "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=600&h=400&fit=crop&q=80";
             
             // Check if image is already base64 (from IndexedDB)
-            const isBase64 = imgUrl && imgUrl.startsWith("data:image");
+            const isBase64 = imgUrl && typeof imgUrl === "string" && imgUrl.startsWith("data:image");
             
-            // If offline and not base64, try to get from IndexedDB
-            if (!navigator.onLine && !isBase64 && article.link && db) {
-                const tx = db.transaction("articles", "readonly");
-                const store = tx.objectStore("articles");
-                const req = store.get(article.link);
-                
-                req.onsuccess = () => {
-                    const savedArticle = req.result;
-                    if (savedArticle && savedArticle.image && savedArticle.image.startsWith("data:image")) {
-                        // Update the image with base64 from IndexedDB
-                        const img = card.querySelector("img");
-                        if (img) {
-                            img.src = savedArticle.image;
-                        }
-                    } else {
-                        // No base64 available, use placeholder
-                        const img = card.querySelector("img");
-                        if (img && !img.src.startsWith("data:image")) {
-                            img.src = placeholderImg;
-                        }
-                    }
-                };
-            }
+            console.log("Article:", article.title?.substring(0, 30), "Has base64:", isBase64, "Image length:", imgUrl?.length);
             
             // Set initial image URL
-            if (!imgUrl || typeof imgUrl !== "string" || imgUrl.trim().length < 5) {
+            if (isBase64) {
+                // Already have base64 image, use it directly
+                imgUrl = article.image;
+            } else if (!imgUrl || typeof imgUrl !== "string" || imgUrl.trim().length < 5) {
+                // No image at all, use placeholder
                 imgUrl = placeholderImg;
-            } else if (!navigator.onLine && !isBase64) {
-                // Offline and not base64 - show placeholder initially, will be replaced if base64 found
+            } else if (navigator.onLine) {
+                // Online, use the URL
+                imgUrl = article.image;
+            } else {
+                // Offline and have URL but not base64, use placeholder
                 imgUrl = placeholderImg;
             }
 
@@ -656,6 +644,8 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        console.log("Loading from IndexedDB, category:", currentCategory);
+
         const tx = db.transaction("articles", "readonly");
         const store = tx.objectStore("articles");
         const req = store.getAll();
@@ -663,9 +653,12 @@ document.addEventListener("DOMContentLoaded", () => {
         req.onsuccess = () => {
             let items = req.result || [];
             
+            console.log("Total articles in DB:", items.length);
+            
             // Filter by category if not "general"
             if (currentCategory && currentCategory !== "general") {
                 items = items.filter(item => item.category === currentCategory);
+                console.log(`Filtered to ${currentCategory}:`, items.length, "articles");
             }
             
             if (!items.length) {
@@ -674,12 +667,16 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             
             newsContainer.innerHTML = "";
-            newsPool = items.map(i => ({
-                title: i.title,
-                description: i.description,
-                link: i.link,
-                image: i.image
-            }));
+            newsPool = items.map(i => {
+                const hasBase64 = i.image && i.image.startsWith("data:image");
+                console.log("Article:", i.title?.substring(0, 30), "Has base64:", hasBase64);
+                return {
+                    title: i.title,
+                    description: i.description,
+                    link: i.link,
+                    image: i.image
+                };
+            });
 
             renderNextBatch();
 
@@ -701,10 +698,7 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     }
 
-    function showOfflineBanner(show) {
-        if (!offlineBanner) return;
-        offlineBanner.style.display = show ? "block" : "none";
-    }
+
 
     // Category click handler
     categoryButtons.forEach(btn => {
@@ -961,7 +955,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     window.addEventListener("online", () => {
-        showOfflineBanner(false);
         const btn = document.getElementById("loadMoreButton");
         const loadMore = document.getElementById("loadMoreButton");
         if (loadMore) {
@@ -984,8 +977,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     window.addEventListener("offline", () => {
-        showOfflineBanner(true);
-
         // Sync with Internet
         const loadMore = document.getElementById("loadMoreButton");
         if (loadMore) {
@@ -997,9 +988,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 alert("Internet required to sync new articles!");
             };
             setTimeout(() => {
-                if (!navigator.onLine) {
-                    showOfflineBanner(true);
-                } else {
+                if (navigator.onLine) {
                     loadNews();
                 }
             }, 300);
