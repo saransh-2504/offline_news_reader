@@ -531,40 +531,44 @@ document.addEventListener("DOMContentLoaded", () => {
             const safeDesc = (article.description || "").replace(/"/g, '&quot;');
             const safeImg = (article.image || "").replace(/"/g, '&quot;');
 
-            // Handle image URL with better fallback
+            // Handle image URL with smart fallback
             let imgUrl = article.image;
             
             // Default placeholder image
             const placeholderImg = "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=600&h=400&fit=crop&q=80";
             
-            // If offline, try to get base64 image from IndexedDB
-            if (!navigator.onLine && article.link) {
-                // We'll load the base64 image asynchronously
-                if (db) {
-                    const tx = db.transaction("articles", "readonly");
-                    const store = tx.objectStore("articles");
-                    const req = store.get(article.link);
-                    
-                    req.onsuccess = () => {
-                        const savedArticle = req.result;
-                        if (savedArticle && savedArticle.image && savedArticle.image.startsWith("data:image")) {
-                            // Update the image with base64 from IndexedDB
-                            const img = card.querySelector("img");
-                            if (img) {
-                                img.src = savedArticle.image;
-                            }
+            // Check if image is already base64 (from IndexedDB)
+            const isBase64 = imgUrl && imgUrl.startsWith("data:image");
+            
+            // If offline and not base64, try to get from IndexedDB
+            if (!navigator.onLine && !isBase64 && article.link && db) {
+                const tx = db.transaction("articles", "readonly");
+                const store = tx.objectStore("articles");
+                const req = store.get(article.link);
+                
+                req.onsuccess = () => {
+                    const savedArticle = req.result;
+                    if (savedArticle && savedArticle.image && savedArticle.image.startsWith("data:image")) {
+                        // Update the image with base64 from IndexedDB
+                        const img = card.querySelector("img");
+                        if (img) {
+                            img.src = savedArticle.image;
                         }
-                    };
-                }
+                    } else {
+                        // No base64 available, use placeholder
+                        const img = card.querySelector("img");
+                        if (img && !img.src.startsWith("data:image")) {
+                            img.src = placeholderImg;
+                        }
+                    }
+                };
             }
             
-            // Check if image URL is valid
+            // Set initial image URL
             if (!imgUrl || typeof imgUrl !== "string" || imgUrl.trim().length < 5) {
                 imgUrl = placeholderImg;
-            }
-            
-            // If offline and image is not base64, use placeholder temporarily
-            if (!navigator.onLine && imgUrl && !imgUrl.startsWith("data:image")) {
+            } else if (!navigator.onLine && !isBase64) {
+                // Offline and not base64 - show placeholder initially, will be replaced if base64 found
                 imgUrl = placeholderImg;
             }
 
