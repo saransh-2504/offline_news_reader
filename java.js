@@ -517,7 +517,7 @@ document.addEventListener("DOMContentLoaded", () => {
         loader.style.display = "block";
 
         if (!API_KEY) {
-            newsContainer.innerHTML = "<h3>Please add your GNews API key in java.js to load online news. Loading cached articles if available...</h3>";
+            newsContainer.innerHTML = "<h3>Please add your NewsData.io API key in java.js to load online news. Loading cached articles if available...</h3>";
             loadFromDBArticles();
             return;
         }
@@ -608,7 +608,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
             else {
-                console.warn("No articles returned from GNews for URL:", url);
+                console.warn("No articles returned from API for URL:", url);
                 console.warn("API Response data:", data);
                 
                 // If API fails, try to load from cache
@@ -623,7 +623,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
         catch (err) {
-            console.error("GNews fetch error:", err);
+            console.error("News API fetch error:", err);
             
             // If fetch fails, try to load from cache
             if (db) {
