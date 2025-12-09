@@ -10,6 +10,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const categoryButtons = document.querySelectorAll(".cat");
     const offlineBanner = document.getElementById("offlineBanner");
     const loader = document.getElementById("loader");
+    
+    // Show/hide offline indicator
+    function updateOfflineStatus() {
+        if (!navigator.onLine) {
+            if (offlineBanner) {
+                offlineBanner.textContent = "📵 You're offline — Showing cached articles. Go online to load fresh news.";
+                offlineBanner.style.display = "block";
+            }
+        } else {
+            if (offlineBanner) {
+                offlineBanner.style.display = "none";
+            }
+        }
+    }
 
 
     // INDEXEDDB SETUP - This will store everything (user data, articles, theme, etc.)
@@ -50,12 +64,44 @@ document.addEventListener("DOMContentLoaded", () => {
         db = e.target.result;
         console.log("IndexedDB ready");
         
+        // Fix articles with undefined category
+        fixUndefinedCategories();
+        
         // Load theme preference from IndexedDB
         loadThemeFromDB();
+        
+        // Update offline status
+        updateOfflineStatus();
         
         // Check if user is logged in
         checkLoginStatus();
     };
+    
+    // Fix articles that have undefined category
+    function fixUndefinedCategories() {
+        if (!db) return;
+        
+        const tx = db.transaction("articles", "readwrite");
+        const store = tx.objectStore("articles");
+        const req = store.getAll();
+        
+        req.onsuccess = () => {
+            const articles = req.result || [];
+            let fixed = 0;
+            
+            articles.forEach(article => {
+                if (!article.category || article.category === "undefined") {
+                    article.category = "general"; // Default to general
+                    store.put(article);
+                    fixed++;
+                }
+            });
+            
+            if (fixed > 0) {
+                console.log(`Fixed ${fixed} articles with undefined category`);
+            }
+        };
+    }
 
     openReq.onerror = (e) => {
         console.warn("IndexedDB failed to open", e);
@@ -334,10 +380,15 @@ document.addEventListener("DOMContentLoaded", () => {
     let isSecondBatchLoading = false; // Track if second batch is loading
 
     const API_KEY = "994ad92756a3d2e963f645d08c268201"; // Your GNews API key
-    let currentCategory = "general"; // Current news category
+    let currentCategory = "general"; // Current news category (default to general)
     let searchText = ""; // Search keyword
     let pageIndex = 0; // Current page for API
     let isLoading = false; // Track if API call is in progress
+    
+    // Ensure currentCategory is never undefined
+    function getCurrentCategory() {
+        return currentCategory || "general";
+    }
 
     // Random search queries for variety
     const RANDOM_QUERIES = [
@@ -417,21 +468,22 @@ document.addEventListener("DOMContentLoaded", () => {
                         // Convert and save each article with base64 image
                         for (const a of data.articles) {
                             const base64Img = await convertImageToBase64(a.image);
+                            const category = getCurrentCategory();
                             const articleObj = {
                                 title: a.title || "",
                                 description: a.description || "",
                                 url: a.url || a.link || "",
                                 image: base64Img || a.image, // Use base64 if available, fallback to URL
                                 publishedAt: a.publishedAt || a.pubDate || "",
-                                category: currentCategory // Store category for offline filtering
+                                category: category // Store category for offline filtering
                             };
                             articleObj.link = articleObj.url;
                             store.put(articleObj);
                             
                             if (base64Img) {
-                                console.log("✓ Saved with base64:", a.title?.substring(0, 30));
+                                console.log("✓ Saved with base64 [" + category + "]:", a.title?.substring(0, 30));
                             } else {
-                                console.warn("✗ No base64 for:", a.title?.substring(0, 30));
+                                console.warn("✗ No base64 for [" + category + "]:", a.title?.substring(0, 30));
                             }
                         }
                         
@@ -484,34 +536,49 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function convertImageToBase64(url) {
-        if (!url || typeof url !== "string" || url.trim().length < 5) return "";
+        if (!url || typeof url !== "string" || url.trim().length < 5) {
+            console.warn("Invalid image URL:", url);
+            return "";
+        }
         
         try {
-            // Add timeout to prevent hanging
+            // Add timeout to prevent hanging (increased to 10 seconds)
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
             
-            const res = await fetch(url, { signal: controller.signal });
+            const res = await fetch(url, { 
+                signal: controller.signal,
+                mode: 'cors'
+            });
             clearTimeout(timeoutId);
             
-            if (!res.ok) return "";
+            if (!res.ok) {
+                console.warn("Fetch failed for:", url, "Status:", res.status);
+                return "";
+            }
             
             const blob = await res.blob();
             
             // Check if blob is actually an image
             if (!blob.type.startsWith('image/')) {
-                console.warn("Not an image:", url);
+                console.warn("Not an image:", url, "Type:", blob.type);
                 return "";
             }
             
-            return await new Promise((resolve) => {
+            const base64 = await new Promise((resolve) => {
                 const reader = new FileReader();
                 reader.onloadend = () => resolve(reader.result);
-                reader.onerror = () => resolve("");
+                reader.onerror = () => {
+                    console.warn("FileReader error for:", url);
+                    resolve("");
+                };
                 reader.readAsDataURL(blob);
             });
+            
+            console.log("✓ Converted to base64:", url.substring(0, 50), "Size:", base64.length);
+            return base64;
         } catch (err) {
-            console.warn("Base64 conversion failed:", err.message);
+            console.warn("Base64 conversion failed for:", url, "Error:", err.message);
             return "";
         }
     }
@@ -654,15 +721,29 @@ document.addEventListener("DOMContentLoaded", () => {
             let items = req.result || [];
             
             console.log("Total articles in DB:", items.length);
+            console.log("Current category:", currentCategory);
+            
+            // Log all categories in DB
+            const categories = [...new Set(items.map(i => i.category))];
+            console.log("Categories in DB:", categories);
             
             // Filter by category if not "general"
             if (currentCategory && currentCategory !== "general") {
-                items = items.filter(item => item.category === currentCategory);
-                console.log(`Filtered to ${currentCategory}:`, items.length, "articles");
+                const beforeFilter = items.length;
+                items = items.filter(item => {
+                    console.log("Checking article:", item.title?.substring(0, 20), "Category:", item.category, "Match:", item.category === currentCategory);
+                    return item.category === currentCategory;
+                });
+                console.log(`Filtered ${beforeFilter} articles to ${items.length} for category: ${currentCategory}`);
             }
             
             if (!items.length) {
-                newsContainer.innerHTML = `<h3>No cached ${currentCategory} articles available.</h3>`;
+                newsContainer.innerHTML = `
+                    <div style="text-align: center; padding: 40px;">
+                        <h3>📵 No cached ${currentCategory} articles available</h3>
+                        <p>Please connect to the internet to load ${currentCategory} news.</p>
+                    </div>
+                `;
                 return;
             }
             
@@ -706,6 +787,7 @@ document.addEventListener("DOMContentLoaded", () => {
             categoryButtons.forEach(b => b.classList.remove("active-cat"));
             btn.classList.add("active-cat");
             currentCategory = btn.dataset.category || "general";
+            console.log("Category clicked:", currentCategory);
             
             // Reset everything for new category
             newsContainer.innerHTML = "";
@@ -721,7 +803,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 existingBtn.remove();
             }
             
-            loadNews();
+            // Check if online or offline
+            if (!navigator.onLine) {
+                loadFromDBArticles();
+            } else {
+                loadNews();
+            }
         });
     });
 
@@ -955,6 +1042,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     window.addEventListener("online", () => {
+        updateOfflineStatus();
+        
         const btn = document.getElementById("loadMoreButton");
         const loadMore = document.getElementById("loadMoreButton");
         if (loadMore) {
@@ -977,6 +1066,8 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     window.addEventListener("offline", () => {
+        updateOfflineStatus();
+        
         // Sync with Internet
         const loadMore = document.getElementById("loadMoreButton");
         if (loadMore) {
@@ -985,7 +1076,7 @@ document.addEventListener("DOMContentLoaded", () => {
             loadMore.classList.add("sync-link");
             loadMore.onclick = (e) => {
                 e.preventDefault();
-                alert("Internet required to sync new articles!");
+                alert("📵 Internet required to sync new articles! Please connect to WiFi or mobile data.");
             };
             setTimeout(() => {
                 if (navigator.onLine) {
