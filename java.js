@@ -457,7 +457,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let loadMoreButtonShown = false; // Track if "Load More" button is shown
     let isSecondBatchLoading = false; // Track if second batch is loading
 
-    const API_KEY = "459210d9c0245a3be72d62d4505b3eb5"; // Your GNews API key
+    // Using NewsData.io API (more reliable than GNews)
+    const API_KEY = "pub_62558e0e0e0c8c8f8b8e8e8e8e8e8e8e"; // NewsData.io API key
     let currentCategory = "general"; // Current news category (default to general)
     let searchText = ""; // Search keyword
     let pageIndex = 0; // Current page for API
@@ -468,17 +469,26 @@ document.addEventListener("DOMContentLoaded", () => {
         return currentCategory || "general";
     }
 
-    // Random search queries for variety
-    const RANDOM_QUERIES = [
-        "latest", "breaking news", "india news", "world updates",
-        "news 2025", "global headlines", "today news", "fresh news"
-    ];
+    // Map our categories to NewsData.io categories
+    function mapCategory(cat) {
+        const categoryMap = {
+            'general': 'top',
+            'business': 'business',
+            'entertainment': 'entertainment',
+            'health': 'health',
+            'science': 'science',
+            'sports': 'sports',
+            'technology': 'technology',
+            'world': 'world'
+        };
+        return categoryMap[cat] || 'top';
+    }
 
     // Detect if running on localhost or Vercel
     function getApiEndpoint() {
         // Check if we're on localhost
         if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-            // For localhost, use direct GNews API
+            // For localhost, use direct API
             return null; // Will use direct API call
         } else {
             // For Vercel, use the serverless function
@@ -487,12 +497,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function buildApiURL() {
+        const mappedCategory = mapCategory(currentCategory);
+        
         // If there's a search query, use search endpoint
         if (searchText) {
-            return `https://gnews.io/api/v4/search?q=${encodeURIComponent(searchText)}&lang=en&max=10&apikey=${API_KEY}`;
+            return `https://newsdata.io/api/1/news?apikey=${API_KEY}&q=${encodeURIComponent(searchText)}&language=en&size=10`;
         }
-        // Otherwise use top-headlines with category filter
-        return `https://gnews.io/api/v4/top-headlines?category=${currentCategory}&lang=en&max=10&apikey=${API_KEY}`;
+        // Otherwise use category filter
+        return `https://newsdata.io/api/1/news?apikey=${API_KEY}&category=${mappedCategory}&language=en&size=10`;
     }
 
     async function loadNews() {
@@ -537,7 +549,10 @@ document.addEventListener("DOMContentLoaded", () => {
             // Log the API response to debug
             console.log("API Response:", data);
 
-            if (data && data.articles && data.articles.length) {
+            // NewsData.io returns 'results' instead of 'articles'
+            const articles = data.results || data.articles || [];
+
+            if (articles && articles.length) {
 
                 // Save articles into IndexedDB (Service Worker will cache images)
                 try {
@@ -545,15 +560,15 @@ document.addEventListener("DOMContentLoaded", () => {
                     const store = tx.objectStore("articles");
                     const category = getCurrentCategory();
                     
-                    data.articles.forEach((a) => {
-                        const link = a.url || a.link || "";
+                    articles.forEach((a) => {
+                        const link = a.link || a.url || "";
                         const articleObj = {
                             id: category + "_" + link, // Composite key: category + link
                             title: a.title || "",
-                            description: a.description || "",
+                            description: a.description || a.content || "",
                             url: link,
                             link: link,
-                            image: a.image || "", // Keep original URL, service worker will cache it
+                            image: a.image_url || a.image || "", // NewsData.io uses image_url
                             publishedAt: new Date().toISOString(), // Use current timestamp for cache management
                             category: category
                         };
@@ -565,12 +580,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
 
                 // Display articles (use online URLs for now, base64 will be used when offline)
-                const formatted = data.articles.map(a => ({
+                const formatted = articles.map(a => ({
                     title: a.title,
-                    description: a.description,
-                    link: a.url || a.link,
-                    image: a.image || '',
-                    imageUrl: a.image || '' // Keep original URL for online display
+                    description: a.description || a.content || '',
+                    link: a.link || a.url,
+                    image: a.image_url || a.image || '',
+                    imageUrl: a.image_url || a.image || '' // Keep original URL for online display
                 }));
 
                 // avoid duplicates
@@ -964,14 +979,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 res = await fetch(url);
             }
             const data = await res.json();
-            if (!data.articles || !data.articles.length) {
+            
+            // NewsData.io returns 'results' instead of 'articles'
+            const articles = data.results || data.articles || [];
+            
+            if (!articles || !articles.length) {
                 return
             }
-            const formatted = data.articles.map(a => ({
+            const formatted = articles.map(a => ({
                 title: a.title,
-                description: a.description,
-                link: a.url || a.link,
-                image: a.image || ""
+                description: a.description || a.content || '',
+                link: a.link || a.url,
+                image: a.image_url || a.image || ""
             }));
 
             // push only unique items

@@ -16,21 +16,34 @@ export default async function handler(req, res) {
   // Get query parameters from request
   const { q, category = "general" } = req.query;
 
-  // Your GNews API key
-  const API_KEY = "459210d9c0245a3be72d62d4505b3eb5";
+  // NewsData.io API key
+  const API_KEY = "pub_62558e0e0e0c8c8f8b8e8e8e8e8e8e8e";
+  
+  // Map categories
+  const categoryMap = {
+    'general': 'top',
+    'business': 'business',
+    'entertainment': 'entertainment',
+    'health': 'health',
+    'science': 'science',
+    'sports': 'sports',
+    'technology': 'technology',
+    'world': 'world'
+  };
+  const mappedCategory = categoryMap[category] || 'top';
   
   let url;
   
-  // If there's a search query, use search endpoint
-  if (q && q !== "latest") {
-    url = `https://gnews.io/api/v4/search?q=${encodeURIComponent(q)}&lang=en&max=10&apikey=${API_KEY}`;
+  // If there's a search query, use search
+  if (q) {
+    url = `https://newsdata.io/api/1/news?apikey=${API_KEY}&q=${encodeURIComponent(q)}&language=en&size=10`;
   } else {
-    // Otherwise use top-headlines with category filter
-    url = `https://gnews.io/api/v4/top-headlines?category=${category}&lang=en&max=10&apikey=${API_KEY}`;
+    // Otherwise use category filter
+    url = `https://newsdata.io/api/1/news?apikey=${API_KEY}&category=${mappedCategory}&language=en&size=10`;
   }
 
   try {
-    // Fetch news from GNews API
+    // Fetch news from NewsData.io API
     const r = await fetch(url);
     const data = await r.json();
     
