@@ -533,6 +533,9 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             const data = await res.json();
+            
+            // Log the API response to debug
+            console.log("API Response:", data);
 
             if (data && data.articles && data.articles.length) {
 
@@ -591,10 +594,31 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             else {
                 console.warn("No articles returned from GNews for URL:", url);
+                console.warn("API Response data:", data);
+                
+                // If API fails, try to load from cache
+                if (db) {
+                    newsContainer.innerHTML = "<h3>⚠️ Unable to fetch new articles. Showing cached articles...</h3>";
+                    setTimeout(() => {
+                        loadFromDBArticles();
+                    }, 1000);
+                } else {
+                    newsContainer.innerHTML = "<h3>⚠️ Unable to fetch articles. Please check your API key or try again later.</h3>";
+                }
             }
         }
         catch (err) {
             console.error("GNews fetch error:", err);
+            
+            // If fetch fails, try to load from cache
+            if (db) {
+                newsContainer.innerHTML = "<h3>⚠️ Network error. Showing cached articles...</h3>";
+                setTimeout(() => {
+                    loadFromDBArticles();
+                }, 1000);
+            } else {
+                newsContainer.innerHTML = "<h3>⚠️ Network error. Please try again later.</h3>";
+            }
         }
         finally {
             isLoading = false;
