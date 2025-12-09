@@ -78,6 +78,11 @@ document.addEventListener("DOMContentLoaded", () => {
     openReq.onsuccess = (e) => {
         db = e.target.result;
         
+        // Clear old cached articles (older than 24 hours) when online
+        if (navigator.onLine) {
+            clearOldArticles();
+        }
+        
         // Fix articles with undefined category
         fixUndefinedCategories();
         
@@ -90,6 +95,31 @@ document.addEventListener("DOMContentLoaded", () => {
         // Check if user is logged in
         checkLoginStatus();
     };
+    
+    // Clear old cached articles (older than 24 hours)
+    function clearOldArticles() {
+        if (!db) return;
+        
+        const tx = db.transaction("articles", "readwrite");
+        const store = tx.objectStore("articles");
+        const req = store.getAll();
+        
+        req.onsuccess = () => {
+            const articles = req.result || [];
+            const now = new Date().getTime();
+            const oneDayAgo = now - (24 * 60 * 60 * 1000); // 24 hours in milliseconds
+            
+            articles.forEach(article => {
+                // Delete articles older than 24 hours
+                if (article.publishedAt) {
+                    const articleTime = new Date(article.publishedAt).getTime();
+                    if (articleTime < oneDayAgo) {
+                        store.delete(article.id);
+                    }
+                }
+            });
+        };
+    }
     
     // Fix articles that have undefined category
     function fixUndefinedCategories() {
@@ -488,7 +518,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             url: link,
                             link: link,
                             image: a.image || "", // Keep original URL, service worker will cache it
-                            publishedAt: a.publishedAt || a.pubDate || "",
+                            publishedAt: new Date().toISOString(), // Use current timestamp for cache management
                             category: category
                         };
                         store.put(articleObj);
@@ -898,13 +928,18 @@ document.addEventListener("DOMContentLoaded", () => {
             try {
                 const tx = db.transaction("articles", "readwrite");
                 const store = tx.objectStore("articles");
+                const category = getCurrentCategory();
+                
                 formatted.forEach(a => {
                     store.put({
+                        id: category + "_" + a.link, // Composite key: category + link
                         title: a.title,
                         description: a.description,
                         link: a.link,
+                        url: a.link,
                         image: a.image,
-                        publishedAt: new Date().toISOString()
+                        publishedAt: new Date().toISOString(),
+                        category: category
                     });
                 });
             }
