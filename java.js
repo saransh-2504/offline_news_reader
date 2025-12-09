@@ -15,12 +15,19 @@ document.addEventListener("DOMContentLoaded", () => {
     function updateOfflineStatus() {
         if (!navigator.onLine) {
             if (offlineBanner) {
-                offlineBanner.textContent = "📵 You're offline — Showing cached articles. Go online to load fresh news.";
-                offlineBanner.style.display = "block";
+                // Update the banner content with proper HTML structure
+                offlineBanner.innerHTML = `
+                    <span class="offline-icon">📵</span>
+                    <span class="offline-text">You're Offline</span>
+                    <span class="offline-subtext">Showing cached articles</span>
+                `;
+                offlineBanner.style.display = "flex";
+                document.body.classList.add("offline-mode");
             }
         } else {
             if (offlineBanner) {
                 offlineBanner.style.display = "none";
+                document.body.classList.remove("offline-mode");
             }
         }
     }
@@ -28,7 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // INDEXEDDB SETUP - This will store everything (user data, articles, theme, etc.)
     let db;
-    const DB_VERSION = 3; // Increased version to add new stores
+    const DB_VERSION = 4; // Increased version to use composite key for articles
     const DB_NAME = "newsDB";
     
     // Open or create the database
@@ -38,9 +45,9 @@ document.addEventListener("DOMContentLoaded", () => {
     openReq.onupgradeneeded = (e) => {
         db = e.target.result;
         
-        // Store for news articles
+        // Store for news articles (using composite key: link + category)
         if (!db.objectStoreNames.contains("articles")) {
-            db.createObjectStore("articles", { keyPath: "link" });
+            db.createObjectStore("articles", { keyPath: "id" }); // Changed to use 'id' as key
         }
         
         // Store for saved articles
@@ -172,6 +179,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         
                         // Load news articles
                         if (!navigator.onLine) {
+                            // Reset to general category when loading offline
+                            currentCategory = "general";
+                            setActiveCategoryButton("general");
                             loadFromDBArticles();
                         } else {
                             loadNews();
@@ -379,7 +389,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let loadMoreButtonShown = false; // Track if "Load More" button is shown
     let isSecondBatchLoading = false; // Track if second batch is loading
 
-    const API_KEY = "994ad92756a3d2e963f645d08c268201"; // Your GNews API key
+    const API_KEY = "bb2cdaf3dbb268ba34de8464463e3b2f"; // Your GNews API key
     let currentCategory = "general"; // Current news category (default to general)
     let searchText = ""; // Search keyword
     let pageIndex = 0; // Current page for API
@@ -459,47 +469,33 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (data && data.articles && data.articles.length) {
 
-                // Save articles into IndexedDB with base64 images (background process)
-                (async () => {
-                    try {
-                        const category = getCurrentCategory();
-                        
-                        // Convert all images first, then save in one transaction
-                        const articlesWithBase64 = await Promise.all(
-                            data.articles.map(async (a) => {
-                                const base64Img = await convertImageToBase64(a.image);
-                                return {
-                                    title: a.title || "",
-                                    description: a.description || "",
-                                    url: a.url || a.link || "",
-                                    link: a.url || a.link || "",
-                                    image: base64Img || a.image,
-                                    publishedAt: a.publishedAt || a.pubDate || "",
-                                    category: category
-                                };
-                            })
-                        );
-                        
-                        // Now save all at once in a fresh transaction
-                        const tx = db.transaction("articles", "readwrite");
-                        const store = tx.objectStore("articles");
-                        
-                        articlesWithBase64.forEach(articleObj => {
-                            store.put(articleObj);
-                            const hasBase64 = articleObj.image && articleObj.image.startsWith("data:image");
-                            if (hasBase64) {
-                                console.log("✓ Saved with base64 [" + category + "]:", articleObj.title?.substring(0, 30));
-                            } else {
-                                console.warn("✗ No base64 for [" + category + "]:", articleObj.title?.substring(0, 30));
-                            }
-                        });
-                        
-                        console.log("All articles saved to IndexedDB");
-                    }
-                    catch (err) {
-                        console.warn("Could not write to DB articles store:", err);
-                    }
-                })();
+                // Save articles into IndexedDB (Service Worker will cache images)
+                try {
+                    const tx = db.transaction("articles", "readwrite");
+                    const store = tx.objectStore("articles");
+                    const category = getCurrentCategory();
+                    
+                    data.articles.forEach((a) => {
+                        const link = a.url || a.link || "";
+                        const articleObj = {
+                            id: category + "_" + link, // Composite key: category + link
+                            title: a.title || "",
+                            description: a.description || "",
+                            url: link,
+                            link: link,
+                            image: a.image || "", // Keep original URL, service worker will cache it
+                            publishedAt: a.publishedAt || a.pubDate || "",
+                            category: category
+                        };
+                        store.put(articleObj);
+                        console.log("✓ Saved [" + category + "]:", articleObj.title?.substring(0, 30));
+                    });
+                    
+                    console.log("All articles saved to IndexedDB");
+                }
+                catch (err) {
+                    console.warn("Could not write to DB articles store:", err);
+                }
 
                 // Display articles (use online URLs for now, base64 will be used when offline)
                 const formatted = data.articles.map(a => ({
@@ -608,29 +604,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const safeDesc = (article.description || "").replace(/"/g, '&quot;');
             const safeImg = (article.image || "").replace(/"/g, '&quot;');
 
-            // Handle image URL with smart fallback
+            // Handle image URL - Service Worker will cache images automatically
             let imgUrl = article.image;
             
             // Default placeholder image
             const placeholderImg = "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=600&h=400&fit=crop&q=80";
             
-            // Check if image is already base64 (from IndexedDB)
-            const isBase64 = imgUrl && typeof imgUrl === "string" && imgUrl.startsWith("data:image");
-            
-            console.log("Article:", article.title?.substring(0, 30), "Has base64:", isBase64, "Image length:", imgUrl?.length);
-            
-            // Set initial image URL
-            if (isBase64) {
-                // Already have base64 image, use it directly
-                imgUrl = article.image;
-            } else if (!imgUrl || typeof imgUrl !== "string" || imgUrl.trim().length < 5) {
-                // No image at all, use placeholder
-                imgUrl = placeholderImg;
-            } else if (navigator.onLine) {
-                // Online, use the URL
-                imgUrl = article.image;
-            } else {
-                // Offline and have URL but not base64, use placeholder
+            // Use image URL if available, otherwise placeholder
+            if (!imgUrl || typeof imgUrl !== "string" || imgUrl.trim().length < 5) {
                 imgUrl = placeholderImg;
             }
 
@@ -733,6 +714,10 @@ document.addEventListener("DOMContentLoaded", () => {
             // Log all categories in DB
             const categories = [...new Set(items.map(i => i.category))];
             console.log("Categories in DB:", categories);
+            console.log("Articles per category:", categories.map(cat => ({
+                category: cat,
+                count: items.filter(i => i.category === cat).length
+            })));
             
             // Filter by category if not "general"
             if (currentCategory && currentCategory !== "general") {
@@ -768,18 +753,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             renderNextBatch();
 
-            if (newsPool.length === 0) {
-                showSyncButton();
-            }
-
-            function showSyncButton() {
-                const div = document.createElement("div");
-                div.innerText = "Sync with Internet";
-                div.style.textAlign = "center";
-                div.style.margin = "20px";
-                div.style.fontSize = "18px";
-                document.body.appendChild(div);
-            }
+            // No need for sync button here - it's handled by Load More button
         };
         req.onerror = () => {
             newsContainer.innerHTML = "<h3>Could not load cached articles.</h3>";
@@ -788,11 +762,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 
+    // Set initial active category button
+    function setActiveCategoryButton(category) {
+        categoryButtons.forEach(btn => {
+            btn.classList.remove("active-cat");
+            if (btn.dataset.category === category) {
+                btn.classList.add("active-cat");
+            }
+        });
+    }
+    
     // Category click handler
     categoryButtons.forEach(btn => {
         btn.addEventListener("click", () => {
-            categoryButtons.forEach(b => b.classList.remove("active-cat"));
-            btn.classList.add("active-cat");
+            setActiveCategoryButton(btn.dataset.category || "general");
             currentCategory = btn.dataset.category || "general";
             console.log("Category clicked:", currentCategory);
             
