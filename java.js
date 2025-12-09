@@ -424,7 +424,8 @@ document.addEventListener("DOMContentLoaded", () => {
                             description: a.description || "",
                             url: a.url || a.link || "",
                             image: base64Img || a.image, // Use base64 if available, fallback to URL
-                            publishedAt: a.publishedAt || a.pubDate || ""
+                            publishedAt: a.publishedAt || a.pubDate || "",
+                            category: currentCategory // Store category for offline filtering
                         };
                         articleObj.link = articleObj.url;
                         return store.put(articleObj);
@@ -644,7 +645,7 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     }
 
-    // Load articles from saved section
+    // Load articles from IndexedDB (offline mode)
     function loadFromDBArticles() {
         if (!db) {
             newsContainer.innerHTML = "<h3>No local DB available.</h3>";
@@ -656,11 +657,18 @@ document.addEventListener("DOMContentLoaded", () => {
         const req = store.getAll();
 
         req.onsuccess = () => {
-            const items = req.result || [];
+            let items = req.result || [];
+            
+            // Filter by category if not "general"
+            if (currentCategory && currentCategory !== "general") {
+                items = items.filter(item => item.category === currentCategory);
+            }
+            
             if (!items.length) {
-                newsContainer.innerHTML = "<h3>No cached articles available.</h3>";
+                newsContainer.innerHTML = `<h3>No cached ${currentCategory} articles available.</h3>`;
                 return;
             }
+            
             newsContainer.innerHTML = "";
             newsPool = items.map(i => ({
                 title: i.title,
