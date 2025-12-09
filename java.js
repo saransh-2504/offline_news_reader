@@ -411,22 +411,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (data && data.articles && data.articles.length) {
 
-                // Save articles into saved section
+                // Save articles into IndexedDB with base64 images
                 try {
                     const tx = db.transaction("articles", "readwrite");
                     const store = tx.objectStore("articles");
-                    data.articles.forEach(async (a) => {
+                    
+                    // Use Promise.all to wait for all images to convert
+                    const savePromises = data.articles.map(async (a) => {
                         const base64Img = await convertImageToBase64(a.image);
                         const articleObj = {
                             title: a.title || "",
                             description: a.description || "",
                             url: a.url || a.link || "",
-                            image: base64Img,
+                            image: base64Img || a.image, // Use base64 if available, fallback to URL
                             publishedAt: a.publishedAt || a.pubDate || ""
                         };
                         articleObj.link = articleObj.url;
-                        store.put(articleObj);
+                        return store.put(articleObj);
                     });
+                    
+                    // Wait for all articles to be saved
+                    await Promise.all(savePromises);
+                    console.log("All articles saved to IndexedDB with images");
                 }
                 catch (err) {
                     console.warn("Could not write to DB articles store:", err);
