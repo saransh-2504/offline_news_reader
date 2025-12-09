@@ -458,7 +458,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let isSecondBatchLoading = false; // Track if second batch is loading
 
     // Using NewsData.io API (more reliable than GNews)
-    const API_KEY = "pub_62558e0e0e0c8c8f8b8e8e8e8e8e8e8e"; // NewsData.io API key
+    const API_KEY = "pub_4caad82681b949249356e58d273cb3fe"; // NewsData.io API key
     let currentCategory = "general"; // Current news category (default to general)
     let searchText = ""; // Search keyword
     let pageIndex = 0; // Current page for API

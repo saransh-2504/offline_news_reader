@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   const { q, category = "general" } = req.query;
 
   // NewsData.io API key
-  const API_KEY = "pub_62558e0e0e0c8c8f8b8e8e8e8e8e8e8e";
+  const API_KEY = "pub_4caad82681b949249356e58d273cb3fe";
   
   // Map categories
   const categoryMap = {
