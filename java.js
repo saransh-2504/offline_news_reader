@@ -424,7 +424,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let loadMoreButtonShown = false; // Track if "Load More" button is shown
     let isSecondBatchLoading = false; // Track if second batch is loading
 
-    const API_KEY = "bb2cdaf3dbb268ba34de8464463e3b2f"; // Your GNews API key
+    const API_KEY = "459210d9c0245a3be72d62d4505b3eb5"; // Your GNews API key
     let currentCategory = "general"; // Current news category (default to general)
     let searchText = ""; // Search keyword
     let pageIndex = 0; // Current page for API
