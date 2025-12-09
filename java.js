@@ -459,33 +459,40 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (data && data.articles && data.articles.length) {
 
-                // Save articles into IndexedDB with base64 images
+                // Save articles into IndexedDB with base64 images (background process)
                 (async () => {
                     try {
+                        const category = getCurrentCategory();
+                        
+                        // Convert all images first, then save in one transaction
+                        const articlesWithBase64 = await Promise.all(
+                            data.articles.map(async (a) => {
+                                const base64Img = await convertImageToBase64(a.image);
+                                return {
+                                    title: a.title || "",
+                                    description: a.description || "",
+                                    url: a.url || a.link || "",
+                                    link: a.url || a.link || "",
+                                    image: base64Img || a.image,
+                                    publishedAt: a.publishedAt || a.pubDate || "",
+                                    category: category
+                                };
+                            })
+                        );
+                        
+                        // Now save all at once in a fresh transaction
                         const tx = db.transaction("articles", "readwrite");
                         const store = tx.objectStore("articles");
                         
-                        // Convert and save each article with base64 image
-                        for (const a of data.articles) {
-                            const base64Img = await convertImageToBase64(a.image);
-                            const category = getCurrentCategory();
-                            const articleObj = {
-                                title: a.title || "",
-                                description: a.description || "",
-                                url: a.url || a.link || "",
-                                image: base64Img || a.image, // Use base64 if available, fallback to URL
-                                publishedAt: a.publishedAt || a.pubDate || "",
-                                category: category // Store category for offline filtering
-                            };
-                            articleObj.link = articleObj.url;
+                        articlesWithBase64.forEach(articleObj => {
                             store.put(articleObj);
-                            
-                            if (base64Img) {
-                                console.log("✓ Saved with base64 [" + category + "]:", a.title?.substring(0, 30));
+                            const hasBase64 = articleObj.image && articleObj.image.startsWith("data:image");
+                            if (hasBase64) {
+                                console.log("✓ Saved with base64 [" + category + "]:", articleObj.title?.substring(0, 30));
                             } else {
-                                console.warn("✗ No base64 for [" + category + "]:", a.title?.substring(0, 30));
+                                console.warn("✗ No base64 for [" + category + "]:", articleObj.title?.substring(0, 30));
                             }
-                        }
+                        });
                         
                         console.log("All articles saved to IndexedDB");
                     }
