@@ -35,7 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // INDEXEDDB SETUP - This will store everything (user data, articles, theme, etc.)
     let db;
-    const DB_VERSION = 4; // Increased version to use composite key for articles
+    const DB_VERSION = 5; // Increased version to clear old cached data
     const DB_NAME = "newsDB";
     
     // Open or create the database
@@ -44,6 +44,14 @@ document.addEventListener("DOMContentLoaded", () => {
     // This runs when database is created or upgraded
     openReq.onupgradeneeded = (e) => {
         db = e.target.result;
+        const oldVersion = e.oldVersion;
+        
+        // If upgrading from old version, clear articles store
+        if (oldVersion > 0 && oldVersion < 5) {
+            if (db.objectStoreNames.contains("articles")) {
+                db.deleteObjectStore("articles");
+            }
+        }
         
         // Store for news articles (using composite key: link + category)
         if (!db.objectStoreNames.contains("articles")) {
