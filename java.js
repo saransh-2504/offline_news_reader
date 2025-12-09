@@ -100,49 +100,65 @@ document.addEventListener("DOMContentLoaded", () => {
     function clearOldArticles() {
         if (!db) return;
         
-        const tx = db.transaction("articles", "readwrite");
-        const store = tx.objectStore("articles");
-        const req = store.getAll();
-        
-        req.onsuccess = () => {
-            const articles = req.result || [];
-            const now = new Date().getTime();
-            const oneDayAgo = now - (24 * 60 * 60 * 1000); // 24 hours in milliseconds
+        try {
+            const tx = db.transaction("articles", "readwrite");
+            const store = tx.objectStore("articles");
+            const req = store.getAll();
             
-            articles.forEach(article => {
-                // Delete articles older than 24 hours
-                if (article.publishedAt) {
-                    const articleTime = new Date(article.publishedAt).getTime();
-                    if (articleTime < oneDayAgo) {
-                        store.delete(article.id);
+            req.onsuccess = () => {
+                const articles = req.result || [];
+                const now = new Date().getTime();
+                const oneDayAgo = now - (24 * 60 * 60 * 1000); // 24 hours in milliseconds
+                
+                // Create a new transaction for deletion
+                const deleteTx = db.transaction("articles", "readwrite");
+                const deleteStore = deleteTx.objectStore("articles");
+                
+                articles.forEach(article => {
+                    // Delete articles older than 24 hours
+                    if (article.publishedAt) {
+                        const articleTime = new Date(article.publishedAt).getTime();
+                        if (articleTime < oneDayAgo) {
+                            deleteStore.delete(article.id);
+                        }
                     }
-                }
-            });
-        };
+                });
+            };
+            
+            req.onerror = () => {
+                console.warn("Could not clear old articles");
+            };
+        } catch (err) {
+            console.warn("Error clearing old articles:", err);
+        }
     }
     
     // Fix articles that have undefined category
     function fixUndefinedCategories() {
         if (!db) return;
         
-        const tx = db.transaction("articles", "readwrite");
-        const store = tx.objectStore("articles");
-        const req = store.getAll();
-        
-        req.onsuccess = () => {
-            const articles = req.result || [];
-            let fixed = 0;
+        try {
+            const tx = db.transaction("articles", "readwrite");
+            const store = tx.objectStore("articles");
+            const req = store.getAll();
             
-            articles.forEach(article => {
-                if (!article.category || article.category === "undefined") {
-                    article.category = "general"; // Default to general
-                    store.put(article);
-                    fixed++;
-                }
-            });
+            req.onsuccess = () => {
+                const articles = req.result || [];
+                
+                articles.forEach(article => {
+                    if (!article.category || article.category === "undefined") {
+                        article.category = "general"; // Default to general
+                        store.put(article);
+                    }
+                });
+            };
             
-
-        };
+            req.onerror = () => {
+                console.warn("Could not fix undefined categories");
+            };
+        } catch (err) {
+            console.warn("Error fixing categories:", err);
+        }
     }
 
     openReq.onerror = (e) => {
@@ -187,47 +203,64 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Function to check if user is logged in
     function checkLoginStatus() {
-        if (!db) return;
+        if (!db) {
+            console.warn("DB not ready in checkLoginStatus");
+            return;
+        }
         
-        const tx = db.transaction("settings", "readonly");
-        const store = tx.objectStore("settings");
-        const req = store.get("loggedUser");
-        
-        req.onsuccess = () => {
-            const result = req.result;
+        try {
+            const tx = db.transaction("settings", "readonly");
+            const store = tx.objectStore("settings");
+            const req = store.get("loggedUser");
             
-            if (result && result.value) {
-                // User is logged in
-                const email = result.value;
+            req.onsuccess = () => {
+                const result = req.result;
                 
-                // Get user details
-                const userTx = db.transaction("users", "readonly");
-                const userStore = userTx.objectStore("users");
-                const userReq = userStore.get(email);
-                
-                userReq.onsuccess = () => {
-                    const user = userReq.result;
-                    if (user) {
-                        greetUser.innerText = "Welcome, " + user.first + "!";
-                        authOverlay.style.display = "none";
-                        document.body.classList.remove("blur");
-                        
-                        // Load news articles
-                        if (!navigator.onLine) {
-                            // Reset to general category when loading offline
-                            currentCategory = "general";
-                            setActiveCategoryButton("general");
-                            loadFromDBArticles();
-                        } else {
-                            loadNews();
+                if (result && result.value) {
+                    // User is logged in
+                    const email = result.value;
+                    
+                    // Get user details
+                    const userTx = db.transaction("users", "readonly");
+                    const userStore = userTx.objectStore("users");
+                    const userReq = userStore.get(email);
+                    
+                    userReq.onsuccess = () => {
+                        const user = userReq.result;
+                        if (user) {
+                            greetUser.innerText = "Welcome, " + user.first + "!";
+                            authOverlay.style.display = "none";
+                            document.body.classList.remove("blur");
+                            
+                            // Load news articles
+                            if (!navigator.onLine) {
+                                // Reset to general category when loading offline
+                                currentCategory = "general";
+                                setActiveCategoryButton("general");
+                                loadFromDBArticles();
+                            } else {
+                                loadNews();
+                            }
                         }
-                    }
-                };
-            } else {
-                // No user logged in, show login screen
+                    };
+                    
+                    userReq.onerror = () => {
+                        console.warn("Could not get user details");
+                    };
+                } else {
+                    // No user logged in, show login screen
+                    document.body.classList.add("blur");
+                }
+            };
+            
+            req.onerror = () => {
+                console.warn("Could not check login status");
                 document.body.classList.add("blur");
-            }
-        };
+            };
+        } catch (err) {
+            console.error("Error in checkLoginStatus:", err);
+            document.body.classList.add("blur");
+        }
     }
 
     // Show login screen by default
