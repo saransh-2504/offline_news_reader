@@ -25,26 +25,32 @@
 
   <script>
     document.addEventListener("DOMContentLoaded", () => {
-      // APPLY DARK THEME 
-        try {
-          const saved = localStorage.getItem("themeMode");
-          if (saved === "dark") {
-            document.body.classList.add("dark");
-          } else {
-            document.body.classList.remove("dark");
-          }
-        } catch (e) {}
-
       let container = document.getElementById("savedList");
 
-      let request = indexedDB.open("newsDB", 2);
+      // Open IndexedDB with correct version
+      let request = indexedDB.open("newsDB", 3);
 
       request.onsuccess = function (e) {
         let db = e.target.result;
 
+        // Load theme from IndexedDB
+        try {
+          let themeTx = db.transaction("settings", "readonly");
+          let themeStore = themeTx.objectStore("settings");
+          let themeReq = themeStore.get("themeMode");
+          
+          themeReq.onsuccess = () => {
+            if (themeReq.result && themeReq.result.value === "dark") {
+              document.body.classList.add("dark");
+            }
+          };
+        } catch (e) {
+          console.warn("Could not load theme:", e);
+        }
+
+        // Load saved articles
         let tx = db.transaction("saved", "readonly");
         let store = tx.objectStore("saved");
-
         let getAll = store.getAll();
 
         getAll.onsuccess = function () {
@@ -65,7 +71,7 @@
           onerror="this.onerror=null; this.src='https://via.placeholder.com/600x400.png?text=No+Image+Available';"/>
 
           <div class="content">
-            <div class="tag">Saved</div>
+            <div class="tag">SAVED</div>
             <div class="title-text">${item.title}</div>
             <div class="desc">${item.desc}</div>
             <div class="actions">
@@ -95,9 +101,10 @@
           });
         };
       };
+      
       request.onerror = function () {
         container.innerHTML = "<h2>Could not open local DB.</h2>";
-      }
+      };
     });
   </script>
 

@@ -12,98 +12,135 @@ document.addEventListener("DOMContentLoaded", () => {
     const loader = document.getElementById("loader");
 
 
-    // DARK MODE TOGGLE
-
-    const themeToggle = document.getElementById("themeToggle");
-    let saved = localStorage.getItem("themeMode");
-    if (saved === "dark") {
-        document.body.classList.add("dark");
-        themeToggle.textContent = "☀️";
-    }
-    if (themeToggle) {
-        themeToggle.style.cursor = "pointer";
-        themeToggle.addEventListener("click", () => {
-            const isDark = document.body.classList.toggle("dark");
-            themeToggle.textContent = isDark ? "☀️" : "🌙";
-            localStorage.setItem("themeMode", isDark ? "dark" : "light");
-        });
-    }
-
-    // INDEXEDDB (newsDB)
-
+    // INDEXEDDB SETUP - This will store everything (user data, articles, theme, etc.)
     let db;
-    const DB_VERSION = 2;
+    const DB_VERSION = 3; // Increased version to add new stores
     const DB_NAME = "newsDB";
+    
+    // Open or create the database
     const openReq = indexedDB.open(DB_NAME, DB_VERSION);
+    
+    // This runs when database is created or upgraded
     openReq.onupgradeneeded = (e) => {
         db = e.target.result;
+        
+        // Store for news articles
         if (!db.objectStoreNames.contains("articles")) {
             db.createObjectStore("articles", { keyPath: "link" });
         }
+        
+        // Store for saved articles
         if (!db.objectStoreNames.contains("saved")) {
             db.createObjectStore("saved", { keyPath: "link" });
         }
+        
+        // Store for user account data (email, password, name)
+        if (!db.objectStoreNames.contains("users")) {
+            db.createObjectStore("users", { keyPath: "email" });
+        }
+        
+        // Store for app settings (theme, logged user)
+        if (!db.objectStoreNames.contains("settings")) {
+            db.createObjectStore("settings", { keyPath: "key" });
+        }
     };
 
+    // When database is successfully opened
     openReq.onsuccess = (e) => {
         db = e.target.result;
         console.log("IndexedDB ready");
-
-        // offline launch 
-        if (!navigator.onLine) {
-            const stored = JSON.parse(localStorage.getItem("lastVisibleArticles") || "[]");
-            const loggedUser = localStorage.getItem("loggedUser");
-
-            if (loggedUser) {
-                authOverlay.style.display = "none";
-                document.body.classList.remove("blur");
-                if (stored.length) {
-                    newsContainer.innerHTML = "";
-                    stored.forEach(a => displayNews([a]));
-                }
-                console.log("Offline launch → restored last visible articles");
-                return;
-            }
-            console.log("Offline launch without login → waiting for user login");
-            return;
-        }
-
-        const loggedUser = localStorage.getItem("loggedUser");
-        if (loggedUser) {
-            if (!navigator.onLine) {
-                loadFromDBArticles();
-            }
-            else {
-                loadNews();
-            }
-        }
+        
+        // Load theme preference from IndexedDB
+        loadThemeFromDB();
+        
+        // Check if user is logged in
+        checkLoginStatus();
     };
 
     openReq.onerror = (e) => {
         console.warn("IndexedDB failed to open", e);
     };
 
-    //signup, login, logout, forgot
-    document.body.classList.add("blur");
-    const storedUser = JSON.parse(localStorage.getItem("userData") || "null");
-    const loggedUser = localStorage.getItem("loggedUser");
-    if (!navigator.onLine && loggedUser) {
-        authOverlay.style.display = "none";
-        document.body.classList.remove("blur");
-        const storedArticles = JSON.parse(localStorage.getItem("lastVisibleArticles") || "[]");
-        if (storedArticles.length) {
-            newsContainer.innerHTML = "";
-            storedArticles.forEach(a => displayNews([a]));
-        }
-        console.log("Offline launch/login → showing last visible articles");
-        return;
+    // DARK MODE TOGGLE - Now using IndexedDB instead of localStorage
+    const themeToggle = document.getElementById("themeToggle");
+    
+    // Function to load theme from IndexedDB
+    function loadThemeFromDB() {
+        if (!db) return;
+        
+        const tx = db.transaction("settings", "readonly");
+        const store = tx.objectStore("settings");
+        const req = store.get("themeMode");
+        
+        req.onsuccess = () => {
+            const result = req.result;
+            if (result && result.value === "dark") {
+                document.body.classList.add("dark");
+                themeToggle.textContent = "☀️";
+            }
+        };
+    }
+    
+    // Theme toggle button click handler
+    if (themeToggle) {
+        themeToggle.style.cursor = "pointer";
+        themeToggle.addEventListener("click", () => {
+            const isDark = document.body.classList.toggle("dark");
+            themeToggle.textContent = isDark ? "☀️" : "🌙";
+            
+            // Save theme to IndexedDB
+            if (db) {
+                const tx = db.transaction("settings", "readwrite");
+                const store = tx.objectStore("settings");
+                store.put({ key: "themeMode", value: isDark ? "dark" : "light" });
+            }
+        });
     }
 
-    if (navigator.onLine && loggedUser && storedUser) {
-        greetUser.innerText = "Welcome, " + storedUser.first + "!";
-        authOverlay.style.display = "none";
-        document.body.classList.remove("blur");
+    // Function to check if user is logged in
+    function checkLoginStatus() {
+        if (!db) return;
+        
+        const tx = db.transaction("settings", "readonly");
+        const store = tx.objectStore("settings");
+        const req = store.get("loggedUser");
+        
+        req.onsuccess = () => {
+            const result = req.result;
+            
+            if (result && result.value) {
+                // User is logged in
+                const email = result.value;
+                
+                // Get user details
+                const userTx = db.transaction("users", "readonly");
+                const userStore = userTx.objectStore("users");
+                const userReq = userStore.get(email);
+                
+                userReq.onsuccess = () => {
+                    const user = userReq.result;
+                    if (user) {
+                        greetUser.innerText = "Welcome, " + user.first + "!";
+                        authOverlay.style.display = "none";
+                        document.body.classList.remove("blur");
+                        
+                        // Load news articles
+                        if (!navigator.onLine) {
+                            loadFromDBArticles();
+                        } else {
+                            loadNews();
+                        }
+                    }
+                };
+            } else {
+                // No user logged in, show login screen
+                document.body.classList.add("blur");
+            }
+        };
     }
+
+    // Show login screen by default
+    document.body.classList.add("blur");
 
     window.showLogin = function () {
         signupBox.style.display = "none";
@@ -123,8 +160,10 @@ document.addEventListener("DOMContentLoaded", () => {
         forgotBox.style.display = "block";
     };
 
+    // SIGNUP FUNCTION - Now stores data in IndexedDB
     window.signup = function () {
         try {
+            // Get values from signup form
             const user = {
                 first: document.getElementById("firstName").value.trim(),
                 last: document.getElementById("lastName").value.trim(),
@@ -132,19 +171,34 @@ document.addEventListener("DOMContentLoaded", () => {
                 password: document.getElementById("signupPassword").value.trim()
             };
 
+            // Check if all fields are filled
             if (!user.first || !user.last || !user.email || !user.password) {
                 alert("Please fill all fields.");
                 return;
             }
 
-            localStorage.setItem("userData", JSON.stringify(user));
-            localStorage.setItem("loggedUser", user.email);
+            if (!db) {
+                alert("Database not ready. Please try again.");
+                return;
+            }
 
+            // Save user data to IndexedDB
+            const tx = db.transaction("users", "readwrite");
+            const store = tx.objectStore("users");
+            store.put(user);
+            
+            // Save logged in user email to settings
+            const settingsTx = db.transaction("settings", "readwrite");
+            const settingsStore = settingsTx.objectStore("settings");
+            settingsStore.put({ key: "loggedUser", value: user.email });
+
+            // Update UI
             greetUser.innerText = "Welcome, " + user.first + "!";
             authOverlay.style.display = "none";
             document.body.classList.remove("blur");
+            
+            // Load news
             loadNews();
-
 
         } catch (err) {
             console.error("Signup error:", err);
@@ -152,35 +206,57 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
+    // LOGIN FUNCTION - Now reads from IndexedDB
     window.login = function () {
         try {
             const email = document.getElementById("loginEmail").value.trim();
             const pass = document.getElementById("loginPassword").value.trim();
-            const user = JSON.parse(localStorage.getItem("userData") || "null");
 
-            if (!user) {
-                alert("No account found. Please sign up first.");
+            if (!db) {
+                alert("Database not ready. Please try again.");
                 return;
             }
 
-            if (email === user.email && pass === user.password) {
-                localStorage.setItem("loggedUser", user.email);
-                greetUser.innerText = "WELCOME, " + user.first + "!";
-                authOverlay.style.display = "none";
-                document.body.classList.remove("blur");
-                if (!navigator.onLine) {
-                    const stored = JSON.parse(localStorage.getItem("lastVisibleArticles") || "[]");
-                    newsContainer.innerHTML = "";
-                    if (stored.length) {
-                        stored.forEach(a => displayNews([a]));
-                    }
+            // Get user from IndexedDB
+            const tx = db.transaction("users", "readonly");
+            const store = tx.objectStore("users");
+            const req = store.get(email);
+
+            req.onsuccess = () => {
+                const user = req.result;
+
+                // Check if user exists
+                if (!user) {
+                    alert("No account found. Please sign up first.");
                     return;
                 }
-                loadNews();
-            }
-            else {
-                alert("Incorrect email or password.");
-            }
+
+                // Check password
+                if (pass === user.password) {
+                    // Save logged in user to settings
+                    const settingsTx = db.transaction("settings", "readwrite");
+                    const settingsStore = settingsTx.objectStore("settings");
+                    settingsStore.put({ key: "loggedUser", value: user.email });
+
+                    // Update UI
+                    greetUser.innerText = "WELCOME, " + user.first + "!";
+                    authOverlay.style.display = "none";
+                    document.body.classList.remove("blur");
+
+                    // Load news
+                    if (!navigator.onLine) {
+                        loadFromDBArticles();
+                    } else {
+                        loadNews();
+                    }
+                } else {
+                    alert("Incorrect email or password.");
+                }
+            };
+
+            req.onerror = () => {
+                alert("An error occurred during login.");
+            };
         }
         catch (err) {
             console.error("Login error:", err);
@@ -188,20 +264,42 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
+    // RESET PASSWORD FUNCTION - Now updates IndexedDB
     window.resetPassword = function () {
         try {
             const email = document.getElementById("forgotEmail").value.trim();
             const newPass = document.getElementById("newPassword").value.trim();
-            const user = JSON.parse(localStorage.getItem("userData") || "null");
 
-            if (!user || email !== user.email) {
-                alert("Email not found!");
+            if (!db) {
+                alert("Database not ready. Please try again.");
                 return;
             }
-            user.password = newPass;
-            localStorage.setItem("userData", JSON.stringify(user));
-            alert("Password reset successful!");
-            showLogin();
+
+            // Get user from IndexedDB
+            const tx = db.transaction("users", "readwrite");
+            const store = tx.objectStore("users");
+            const req = store.get(email);
+
+            req.onsuccess = () => {
+                const user = req.result;
+
+                // Check if user exists
+                if (!user) {
+                    alert("Email not found!");
+                    return;
+                }
+
+                // Update password
+                user.password = newPass;
+                store.put(user);
+
+                alert("Password reset successful!");
+                showLogin();
+            };
+
+            req.onerror = () => {
+                alert("An error occurred.");
+            };
         }
         catch (err) {
             console.error("Reset error:", err);
@@ -209,35 +307,63 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
+    // LOGOUT FUNCTION - Now removes from IndexedDB
     window.logout = function () {
-        localStorage.removeItem("loggedUser");
+        if (!db) {
+            alert("Database not ready.");
+            return;
+        }
+
+        // Remove logged user from settings
+        const tx = db.transaction("settings", "readwrite");
+        const store = tx.objectStore("settings");
+        store.delete("loggedUser");
+
+        // Update UI
         document.body.classList.add("blur");
         authOverlay.style.display = "flex";
         alert("Logged out!");
     };
 
-    // GNEWS INFINITE SCROLL
-    const BATCH_SIZE = 10;
-    const AUTO_BATCH_LIMIT = 20;
-    let totalDisplayed = 0;
-    let newsPool = [];
-    let loadMoreButtonShown = false;
+    // NEWS LOADING CONFIGURATION
+    const BATCH_SIZE = 10; // Number of articles to show at once
+    const AUTO_BATCH_LIMIT = 20; // After this many articles, show "Load More" button
+    let totalDisplayed = 0; // Track how many articles are displayed
+    let newsPool = []; // Array to store fetched articles
+    let loadMoreButtonShown = false; // Track if "Load More" button is shown
+    let isSecondBatchLoading = false; // Track if second batch is loading
 
-    const API_KEY = "01f34776ac18f47af61d0c44277a190d"; //          --> API KEY 
-    let currentCategory = "general";
-    let searchText = "";
-    let pageIndex = 0;
-    let isLoading = false;
+    const API_KEY = "994ad92756a3d2e963f645d08c268201"; // Your GNews API key
+    let currentCategory = "general"; // Current news category
+    let searchText = ""; // Search keyword
+    let pageIndex = 0; // Current page for API
+    let isLoading = false; // Track if API call is in progress
 
+    // Random search queries for variety
     const RANDOM_QUERIES = [
         "latest", "breaking news", "india news", "world updates",
         "news 2025", "global headlines", "today news", "fresh news"
     ];
 
-    function buildApiURL() {
-        const q = searchText || RANDOM_QUERIES[pageIndex % RANDOM_QUERIES.length];
-        return `https://gnews.io/api/v4/search?q=${encodeURIComponent(q)}&topic=${currentCategory}&lang=en&page=${pageIndex}&apikey=${API_KEY}`;
+    // Detect if running on localhost or Vercel
+    function getApiEndpoint() {
+        // Check if we're on localhost
+        if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+            // For localhost, use direct GNews API
+            return null; // Will use direct API call
+        } else {
+            // For Vercel, use the serverless function
+            return "/api/news";
+        }
+    }
 
+    function buildApiURL() {
+        // If there's a search query, use search endpoint
+        if (searchText) {
+            return `https://gnews.io/api/v4/search?q=${encodeURIComponent(searchText)}&lang=en&max=10&apikey=${API_KEY}`;
+        }
+        // Otherwise use top-headlines with category filter
+        return `https://gnews.io/api/v4/top-headlines?category=${currentCategory}&lang=en&max=10&apikey=${API_KEY}`;
     }
 
     async function loadNews() {
@@ -263,13 +389,23 @@ document.addEventListener("DOMContentLoaded", () => {
         const url = buildApiURL();
 
         try {
-            const API_ENDPOINT = "https://testing-new-five.vercel.app/api/news";
-            const backendURL =
-                `${API_ENDPOINT}?q=${encodeURIComponent(searchText || "latest")}` +
-                `&topic=${currentCategory}` +
-                `&page=${pageIndex}`;
-
-            const res = await fetch(backendURL);
+            let res;
+            const apiEndpoint = getApiEndpoint();
+            
+            // Use appropriate endpoint based on environment
+            if (apiEndpoint) {
+                // Running on Vercel - use serverless function
+                let backendURL;
+                if (searchText) {
+                    backendURL = `${apiEndpoint}?q=${encodeURIComponent(searchText)}`;
+                } else {
+                    backendURL = `${apiEndpoint}?category=${currentCategory}`;
+                }
+                res = await fetch(backendURL);
+            } else {
+                // Running on localhost - use direct API call
+                res = await fetch(url);
+            }
 
             const data = await res.json();
 
@@ -312,13 +448,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
                 pageIndex++;
 
+                // First batch - show immediately
                 if (totalDisplayed === 0) {
-                    loader.style.display = "block";
-                    setTimeout(() => {
-                        loader.style.display = "none";
-                        renderNextBatch();
-                        loadSecondBatch();
-                    }, 1500);
+                    renderNextBatch();
+                    
+                    // Load second batch with loader after user scrolls
+                    setupScrollListener();
                 }
                 else {
                     renderNextBatch();
@@ -353,6 +488,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 }
 
+    // DISPLAY NEWS CARDS - Creates HTML cards for each article
     function displayNews(articles) {
         if (!articles || !articles.length) {
             if (!newsContainer.children.length) {
@@ -365,21 +501,25 @@ document.addEventListener("DOMContentLoaded", () => {
             const card = document.createElement("div");
             card.className = "card";
 
+            // Escape special characters to prevent HTML injection
             const safeTitle = (article.title || "No title").replace(/"/g, '&quot;');
             const safeDesc = (article.description || "").replace(/"/g, '&quot;');
             const safeImg = (article.image || "").replace(/"/g, '&quot;');
 
-            // CLEAN IMAGE URL
+            // Handle image URL
             let imgUrl = article.image;
+            
+            // If offline and image is not base64, use placeholder
             if (!navigator.onLine && !imgUrl.startsWith("data:image")) {
                 imgUrl = "https://via.placeholder.com/600x400.png?text=No+Image+Available";
             }
 
-            // Iif image is not available then replace it 
+            // If no image, use placeholder
             if (!imgUrl || typeof imgUrl !== "string" || imgUrl.length < 5) {
                 imgUrl = "https://via.placeholder.com/600x400.png?text=No+Image+Available";
             }
 
+            // Create card HTML
             card.innerHTML = `<img src="${imgUrl}" alt="Article Image"
       onerror="this.onerror=null; this.src='https://via.placeholder.com/600x400.png?text=No+Image+Available';"/>
       <div class="content">
@@ -393,11 +533,11 @@ document.addEventListener("DOMContentLoaded", () => {
       </div>`;
 
             newsContainer.appendChild(card);
-            saveCurrentlyVisibleArticles();
 
+            // Check if this article is already saved
             (function markSavedIfNeeded() {
                 if (!db) {
-                    return
+                    return;
                 }
                 try {
                     const link = article.link;
@@ -417,36 +557,43 @@ document.addEventListener("DOMContentLoaded", () => {
                 catch (err) {
                     console.warn("Could not check saved state:", err);
                 }
-            });
+            })();
         });
     }
 
-    function saveCurrentlyVisibleArticles() {
-        const cards = document.querySelectorAll(".card");
-        const list = [];
-        cards.forEach(card => {
-            const title = card.querySelector(".title-text")?.innerText || "";
-            const desc = card.querySelector(".desc")?.innerText || "";
-            const img = card.querySelector("img")?.src || "";
-            const link = card.querySelector("a.btn")?.href || "";
-            list.push({ title, desc, img, link });
-        });
-
-        localStorage.setItem("lastVisibleArticles", JSON.stringify(list));
-    }
-
+    // OFFLINE SEARCH - Search through cached articles
     function searchOffline(keyword) {
-        const stored = JSON.parse(localStorage.getItem("lastVisibleArticles") || "[]");
-        if (!stored.length) {
-            return
-        }
-        const lower = keyword.toLowerCase();
-        const results = stored.filter(a =>
-            a.title.toLowerCase().includes(lower) ||
-            a.desc.toLowerCase().includes(lower)
-        );
-        newsContainer.innerHTML = "";
-        results.forEach(a => displayNews([a]));
+        if (!db) return;
+        
+        // Search in articles store
+        const tx = db.transaction("articles", "readonly");
+        const store = tx.objectStore("articles");
+        const req = store.getAll();
+        
+        req.onsuccess = () => {
+            const articles = req.result || [];
+            const lower = keyword.toLowerCase();
+            
+            // Filter articles by keyword
+            const results = articles.filter(a =>
+                (a.title && a.title.toLowerCase().includes(lower)) ||
+                (a.description && a.description.toLowerCase().includes(lower))
+            );
+            
+            // Display results
+            newsContainer.innerHTML = "";
+            if (results.length) {
+                const formatted = results.map(a => ({
+                    title: a.title,
+                    description: a.description,
+                    link: a.link,
+                    image: a.image
+                }));
+                displayNews(formatted);
+            } else {
+                newsContainer.innerHTML = "<h3>No matching articles found.</h3>";
+            }
+        };
     }
 
     // Load articles from saved section
@@ -505,8 +652,21 @@ document.addEventListener("DOMContentLoaded", () => {
             categoryButtons.forEach(b => b.classList.remove("active-cat"));
             btn.classList.add("active-cat");
             currentCategory = btn.dataset.category || "general";
+            
+            // Reset everything for new category
             newsContainer.innerHTML = "";
+            newsPool = [];
+            totalDisplayed = 0;
             pageIndex = 0;
+            loadMoreButtonShown = false;
+            isSecondBatchLoading = false;
+            
+            // Remove existing load more button if present
+            const existingBtn = document.getElementById("loadMoreButton");
+            if (existingBtn) {
+                existingBtn.remove();
+            }
+            
             loadNews();
         });
     });
@@ -523,8 +683,21 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
             searchText = keyword;
+            
+            // Reset everything for new search
             newsContainer.innerHTML = "";
+            newsPool = [];
+            totalDisplayed = 0;
             pageIndex = 0;
+            loadMoreButtonShown = false;
+            isSecondBatchLoading = false;
+            
+            // Remove existing load more button if present
+            const existingBtn = document.getElementById("loadMoreButton");
+            if (existingBtn) {
+                existingBtn.remove();
+            }
+            
             loadNews();
         }, 400);
     });
@@ -554,19 +727,31 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // fetch more articles and store
+    // FETCH MORE ARTICLES - Gets additional articles and stores them
     async function fetchAndCacheArticles() {
         if (!API_KEY) {
-            return
+            return;
         }
-        const url = buildApiURL();
+        
         try {
-            const apiURL =
-    `https://testing-new-five.vercel.app/api/news?q=${encodeURIComponent(searchText || "latest")}` +
-    `&topic=${currentCategory}` +
-    `&page=${pageIndex}`;
-
-const res = await fetch(apiURL);
+            let res;
+            const apiEndpoint = getApiEndpoint();
+            
+            // Use appropriate endpoint based on environment
+            if (apiEndpoint) {
+                // Running on Vercel - use serverless function
+                let apiURL;
+                if (searchText) {
+                    apiURL = `${apiEndpoint}?q=${encodeURIComponent(searchText)}`;
+                } else {
+                    apiURL = `${apiEndpoint}?category=${currentCategory}`;
+                }
+                res = await fetch(apiURL);
+            } else {
+                // Running on localhost - use direct API call
+                const url = buildApiURL();
+                res = await fetch(url);
+            }
             const data = await res.json();
             if (!data.articles || !data.articles.length) {
                 return
@@ -642,17 +827,40 @@ const res = await fetch(apiURL);
     }
 
 
-    // second batch calling
-    async function loadSecondBatch() {
-        if (!navigator.onLine) return;
-        if (newsPool.length < BATCH_SIZE) {
-            await fetchAndCacheArticles();
-        }
-        loader.style.display = "block";
-        setTimeout(() => {
-            loader.style.display = "none";
-            renderNextBatch();
-        }, 1000);
+    // SCROLL LISTENER - Shows loader when user reaches bottom, then loads second batch
+    function setupScrollListener() {
+        if (isSecondBatchLoading) return; // Prevent multiple listeners
+        
+        const scrollHandler = async () => {
+            // Check if user scrolled near bottom
+            const scrollPosition = window.innerHeight + window.scrollY;
+            const pageHeight = document.documentElement.scrollHeight;
+            
+            // If user is within 200px of bottom
+            if (scrollPosition >= pageHeight - 200 && !isSecondBatchLoading) {
+                isSecondBatchLoading = true;
+                
+                // Remove scroll listener
+                window.removeEventListener("scroll", scrollHandler);
+                
+                // Show loader for 2 seconds
+                loader.style.display = "block";
+                
+                // Fetch more articles if needed
+                if (newsPool.length < BATCH_SIZE && navigator.onLine) {
+                    await fetchAndCacheArticles();
+                }
+                
+                // Wait 2 seconds then show articles
+                setTimeout(() => {
+                    loader.style.display = "none";
+                    renderNextBatch();
+                }, 2000);
+            }
+        };
+        
+        // Add scroll event listener
+        window.addEventListener("scroll", scrollHandler);
     }
 
     // LOAD MORE BUTTON
