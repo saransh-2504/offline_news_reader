@@ -1,6 +1,7 @@
 // Service Worker for Offline News Reader
-const CACHE_NAME = 'news-cache-v1';
-const RUNTIME_CACHE = 'news-runtime-v1';
+// Updated: 2025-12-09
+const CACHE_NAME = 'news-cache-v2';
+const RUNTIME_CACHE = 'news-runtime-v2';
 
 // Files to cache immediately on install
 const STATIC_CACHE_URLS = [
