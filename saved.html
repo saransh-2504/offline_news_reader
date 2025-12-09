@@ -27,8 +27,8 @@
     document.addEventListener("DOMContentLoaded", () => {
       let container = document.getElementById("savedList");
 
-      // Open IndexedDB with correct version
-      let request = indexedDB.open("newsDB", 3);
+      // Open IndexedDB with correct version (must match java.js)
+      let request = indexedDB.open("newsDB", 5);
 
       request.onsuccess = function (e) {
         let db = e.target.result;
