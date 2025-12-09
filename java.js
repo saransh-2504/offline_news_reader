@@ -432,12 +432,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     console.warn("Could not write to DB articles store:", err);
                 }
 
-                // Display articles
+                // Display articles (use online URLs for now, base64 will be used when offline)
                 const formatted = data.articles.map(a => ({
                     title: a.title,
                     description: a.description,
                     link: a.url || a.link,
-                    image: a.image || ''
+                    image: a.image || '',
+                    imageUrl: a.image || '' // Keep original URL for online display
                 }));
 
                 // avoid duplicates
@@ -529,12 +530,33 @@ document.addEventListener("DOMContentLoaded", () => {
             // Default placeholder image
             const placeholderImg = "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=600&h=400&fit=crop&q=80";
             
+            // If offline, try to get base64 image from IndexedDB
+            if (!navigator.onLine && article.link) {
+                // We'll load the base64 image asynchronously
+                if (db) {
+                    const tx = db.transaction("articles", "readonly");
+                    const store = tx.objectStore("articles");
+                    const req = store.get(article.link);
+                    
+                    req.onsuccess = () => {
+                        const savedArticle = req.result;
+                        if (savedArticle && savedArticle.image && savedArticle.image.startsWith("data:image")) {
+                            // Update the image with base64 from IndexedDB
+                            const img = card.querySelector("img");
+                            if (img) {
+                                img.src = savedArticle.image;
+                            }
+                        }
+                    };
+                }
+            }
+            
             // Check if image URL is valid
             if (!imgUrl || typeof imgUrl !== "string" || imgUrl.trim().length < 5) {
                 imgUrl = placeholderImg;
             }
             
-            // If offline and image is not base64, use placeholder
+            // If offline and image is not base64, use placeholder temporarily
             if (!navigator.onLine && imgUrl && !imgUrl.startsWith("data:image")) {
                 imgUrl = placeholderImg;
             }
