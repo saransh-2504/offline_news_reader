@@ -750,28 +750,51 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 400);
     });
 
-    // Save article into saved store
-    document.addEventListener("click", (e) => {
+    // Save article into saved store with base64 image
+    document.addEventListener("click", async (e) => {
         if (e.target && e.target.classList.contains("save-btn")) {
             const link = e.target.dataset.link;
             const title = e.target.dataset.title || "Untitled";
-            const img = e.target.dataset.img || "";
+            let img = e.target.dataset.img || "";
             const desc = e.target.dataset.desc || "";
+            
             if (!db) {
                 alert("Local DB not ready. Try again in a moment.");
                 return;
             }
-            const tx = db.transaction("saved", "readwrite");
-            const store = tx.objectStore("saved");
-            const article = { link, title, img, desc };
-            const putReq = store.put(article);
-            putReq.onsuccess = () => {
-                e.target.classList.add("saved");
-                e.target.innerHTML = '❤️ Saved';
-            };
-            putReq.onerror = () => {
+            
+            // Try to get base64 image from articles store first
+            try {
+                const articleTx = db.transaction("articles", "readonly");
+                const articleStore = articleTx.objectStore("articles");
+                const articleReq = articleStore.get(link);
+                
+                articleReq.onsuccess = () => {
+                    const savedArticle = articleReq.result;
+                    // Use base64 image if available, otherwise use the URL
+                    if (savedArticle && savedArticle.image && savedArticle.image.startsWith("data:image")) {
+                        img = savedArticle.image;
+                    }
+                    
+                    // Save to saved store
+                    const tx = db.transaction("saved", "readwrite");
+                    const store = tx.objectStore("saved");
+                    const article = { link, title, img, desc };
+                    const putReq = store.put(article);
+                    
+                    putReq.onsuccess = () => {
+                        e.target.classList.add("saved");
+                        e.target.innerHTML = '❤️ Saved';
+                    };
+                    
+                    putReq.onerror = () => {
+                        alert("Could not save article.");
+                    };
+                };
+            } catch (err) {
+                console.warn("Error saving article:", err);
                 alert("Could not save article.");
-            };
+            }
         }
     });
 
