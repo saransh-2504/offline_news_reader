@@ -443,8 +443,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let loadMoreButtonShown = false; // Track if "Load More" button is shown
     let isSecondBatchLoading = false; // Track if second batch is loading
 
-    // Using NewsData.io API (more reliable than GNews)
-    const API_KEY = "pub_4caad82681b949249356e58d273cb3fe"; // NewsData.io API key
+    // Using GNews API
+    const API_KEY = "bb2cdaf3dbb268ba34de8464463e3b2f"; // GNews API key
     let currentCategory = "general"; // Current news category (default to general)
     let searchText = ""; // Search keyword
     let pageIndex = 0; // Current page for API
@@ -456,19 +456,9 @@ document.addEventListener("DOMContentLoaded", () => {
         return currentCategory || "general";
     }
 
-    // Map our categories to NewsData.io categories
-    function mapCategory(cat) {
-        const categoryMap = {
-            'general': 'top',
-            'business': 'business',
-            'entertainment': 'entertainment',
-            'health': 'health',
-            'science': 'science',
-            'sports': 'sports',
-            'technology': 'technology',
-            'world': 'world'
-        };
-        return categoryMap[cat] || 'top';
+    // Ensure currentCategory is never undefined
+    function getCurrentCategory() {
+        return currentCategory || "general";
     }
 
     // Detect if running on localhost or Vercel
@@ -484,14 +474,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function buildApiURL() {
-        const mappedCategory = mapCategory(currentCategory);
-        
         // If there's a search query, use search endpoint
         if (searchText) {
-            return `https://newsdata.io/api/1/news?apikey=${API_KEY}&q=${encodeURIComponent(searchText)}&language=en&size=10`;
+            return `https://gnews.io/api/v4/search?q=${encodeURIComponent(searchText)}&lang=en&max=10&apikey=${API_KEY}`;
         }
-        // Otherwise use category filter
-        return `https://newsdata.io/api/1/news?apikey=${API_KEY}&category=${mappedCategory}&language=en&size=10`;
+        // Otherwise use top-headlines with category filter
+        return `https://gnews.io/api/v4/top-headlines?category=${currentCategory}&lang=en&max=10&apikey=${API_KEY}`;
     }
 
     async function loadNews() {
@@ -504,7 +492,7 @@ document.addEventListener("DOMContentLoaded", () => {
         loader.style.display = "block";
 
         if (!API_KEY) {
-            newsContainer.innerHTML = "<h3>Please add your NewsData.io API key in java.js to load online news. Loading cached articles if available...</h3>";
+            newsContainer.innerHTML = "<h3>Please add your GNews API key in java.js to load online news. Loading cached articles if available...</h3>";
             loadFromDBArticles();
             return;
         }
@@ -536,10 +524,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // Log the API response to debug
             console.log("API Response:", data);
 
-            // NewsData.io returns 'results' instead of 'articles'
-            const articles = data.results || data.articles || [];
-
-            if (articles && articles.length) {
+            if (data && data.articles && data.articles.length) {
 
                 // Save articles into IndexedDB (Service Worker will cache images)
                 try {
@@ -547,15 +532,15 @@ document.addEventListener("DOMContentLoaded", () => {
                     const store = tx.objectStore("articles");
                     const category = getCurrentCategory();
                     
-                    articles.forEach((a) => {
-                        const link = a.link || a.url || "";
+                    data.articles.forEach((a) => {
+                        const link = a.url || a.link || "";
                         const articleObj = {
                             id: category + "_" + link, // Composite key: category + link
                             title: a.title || "",
-                            description: a.description || a.content || "",
+                            description: a.description || "",
                             url: link,
                             link: link,
-                            image: a.image_url || a.image || "", // NewsData.io uses image_url
+                            image: a.image || "", // GNews uses image field
                             publishedAt: new Date().toISOString(), // Use current timestamp for cache management
                             sessionTimestamp: sessionTimestamp, // Track which session this article belongs to
                             category: category
@@ -568,12 +553,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
 
                 // Display articles (use online URLs for now, base64 will be used when offline)
-                const formatted = articles.map(a => ({
+                const formatted = data.articles.map(a => ({
                     title: a.title,
-                    description: a.description || a.content || '',
-                    link: a.link || a.url,
-                    image: a.image_url || a.image || '',
-                    imageUrl: a.image_url || a.image || '' // Keep original URL for online display
+                    description: a.description || '',
+                    link: a.url || a.link,
+                    image: a.image || '',
+                    imageUrl: a.image || '' // Keep original URL for online display
                 }));
 
                 // avoid duplicates
@@ -596,7 +581,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
             else {
-                console.warn("No articles returned from API for URL:", url);
+                console.warn("No articles returned from GNews for URL:", url);
                 console.warn("API Response data:", data);
                 
                 // If API fails, try to load from cache
@@ -611,7 +596,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
         catch (err) {
-            console.error("News API fetch error:", err);
+            console.error("GNews fetch error:", err);
             
             // If fetch fails, try to load from cache
             if (db) {
@@ -980,17 +965,14 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             const data = await res.json();
             
-            // NewsData.io returns 'results' instead of 'articles'
-            const articles = data.results || data.articles || [];
-            
-            if (!articles || !articles.length) {
+            if (!data.articles || !data.articles.length) {
                 return
             }
-            const formatted = articles.map(a => ({
+            const formatted = data.articles.map(a => ({
                 title: a.title,
-                description: a.description || a.content || '',
-                link: a.link || a.url,
-                image: a.image_url || a.image || ""
+                description: a.description || '',
+                link: a.url || a.link,
+                image: a.image || ""
             }));
 
             // push only unique items
