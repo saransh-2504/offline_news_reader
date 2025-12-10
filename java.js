@@ -78,10 +78,7 @@ document.addEventListener("DOMContentLoaded", () => {
     openReq.onsuccess = (e) => {
         db = e.target.result;
         
-        // Clear all cached articles when starting a new online session
-        if (navigator.onLine) {
-            clearAllArticlesForFreshStart();
-        }
+        // Don't clear articles on startup - only clear when fetching new news
         
         // Fix articles with undefined category
         fixUndefinedCategories();
@@ -117,6 +114,37 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (err) {
             console.warn("Error clearing articles:", err);
         }
+    }
+    
+    // Clear all articles immediately (returns promise)
+    function clearAllArticlesNow() {
+        return new Promise((resolve) => {
+            if (!db) {
+                resolve();
+                return;
+            }
+            
+            try {
+                const tx = db.transaction("articles", "readwrite");
+                const store = tx.objectStore("articles");
+                
+                // Clear all articles
+                const clearReq = store.clear();
+                
+                clearReq.onsuccess = () => {
+                    console.log("✅ Cleared all old articles - ready for fresh news");
+                    resolve();
+                };
+                
+                clearReq.onerror = () => {
+                    console.warn("Could not clear old articles");
+                    resolve(); // Continue even if clear fails
+                };
+            } catch (err) {
+                console.warn("Error clearing articles:", err);
+                resolve(); // Continue even if clear fails
+            }
+        });
     }
     
     // Fix articles that have undefined category
@@ -497,6 +525,12 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        // Clear all old articles before fetching new ones
+        await clearAllArticlesNow();
+        
+        // Update session timestamp for this new fetch
+        sessionTimestamp = new Date().toISOString();
+
         isLoading = true;
         const url = buildApiURL();
 
@@ -773,6 +807,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         req.onsuccess = () => {
             let items = req.result || [];
+            console.log(`📱 Loading offline articles: Found ${items.length} total articles`);
             
             // When offline, show the most recent articles (latest sessionTimestamp)
             if (items.length > 0) {
@@ -781,8 +816,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     return item.sessionTimestamp > latest ? item.sessionTimestamp : latest;
                 }, '');
                 
+                console.log(`🕒 Latest session timestamp: ${latestSession}`);
+                console.log(`🕒 Current session timestamp: ${sessionTimestamp}`);
+                
                 // Only show articles from the latest session
                 items = items.filter(item => item.sessionTimestamp === latestSession);
+                console.log(`✅ Filtered to ${items.length} articles from latest session`);
             }
             
             // Filter by category if not "general"
