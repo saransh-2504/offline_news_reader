@@ -1,5 +1,6 @@
 // This serverless function works on Vercel
 // It acts as a proxy to the NewsData.io API to avoid CORS issues
+// Updated: 2025-12-10
 
 export default async function handler(req, res) {
   
