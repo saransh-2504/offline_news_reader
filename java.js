@@ -108,7 +108,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const clearReq = store.clear();
             
             clearReq.onsuccess = () => {
-                console.log("✅ Cleared all old articles - starting fresh session");
                 // Set new session timestamp for this fresh start
                 sessionTimestamp = new Date().toISOString();
                 isNewSession = true;
@@ -122,36 +121,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
     
-    // Clear all articles immediately (returns promise)
-    function clearAllArticlesNow() {
-        return new Promise((resolve) => {
-            if (!db) {
-                resolve();
-                return;
-            }
-            
-            try {
-                const tx = db.transaction("articles", "readwrite");
-                const store = tx.objectStore("articles");
-                
-                // Clear all articles
-                const clearReq = store.clear();
-                
-                clearReq.onsuccess = () => {
-                    console.log("✅ Cleared all old articles - ready for fresh news");
-                    resolve();
-                };
-                
-                clearReq.onerror = () => {
-                    console.warn("Could not clear old articles");
-                    resolve(); // Continue even if clear fails
-                };
-            } catch (err) {
-                console.warn("Error clearing articles:", err);
-                resolve(); // Continue even if clear fails
-            }
-        });
-    }
+
     
     // Fix articles that have undefined category
     function fixUndefinedCategories() {
@@ -491,11 +461,6 @@ document.addEventListener("DOMContentLoaded", () => {
         return currentCategory || "general";
     }
 
-    // Ensure currentCategory is never undefined
-    function getCurrentCategory() {
-        return currentCategory || "general";
-    }
-
     // Detect if running on localhost or Vercel
     function getApiEndpoint() {
         // Check if we're on localhost
@@ -533,9 +498,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // Don't clear articles when switching categories - accumulate all categories
-        // Use the same session timestamp for all categories in this session
         if (isNewSession) {
-            console.log(`🆕 Starting new browsing session: ${sessionTimestamp}`);
             isNewSession = false;
         }
 
@@ -574,9 +537,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     const store = tx.objectStore("articles");
                     const category = getCurrentCategory();
                     
-                    console.log(`💾 Storing ${data.articles.length} articles for category: ${category}`);
-                    
-                    data.articles.forEach((a) => {
+                        data.articles.forEach((a) => {
                         const link = a.url || a.link || "";
                         const articleObj = {
                             id: category + "_" + link, // Composite key: category + link
@@ -591,8 +552,6 @@ document.addEventListener("DOMContentLoaded", () => {
                         };
                         store.put(articleObj);
                     });
-                    
-                    console.log(`✅ Successfully stored ${data.articles.length} ${category} articles`);
                 }
                 catch (err) {
                     console.warn("Could not write to DB articles store:", err);
@@ -660,45 +619,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    async function convertImageToBase64(url) {
-        if (!url || typeof url !== "string" || url.trim().length < 5) {
-            return "";
-        }
-        
-        try {
-            // Add timeout to prevent hanging (increased to 10 seconds)
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
-            
-            const res = await fetch(url, { 
-                signal: controller.signal,
-                mode: 'cors'
-            });
-            clearTimeout(timeoutId);
-            
-            if (!res.ok) {
-                return "";
-            }
-            
-            const blob = await res.blob();
-            
-            // Check if blob is actually an image
-            if (!blob.type.startsWith('image/')) {
-                return "";
-            }
-            
-            const base64 = await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.onerror = () => resolve("");
-                reader.readAsDataURL(blob);
-            });
-            
-            return base64;
-        } catch (err) {
-            return "";
-        }
-    }
+
 
     // DISPLAY NEWS CARDS - Creates HTML cards for each article
     function displayNews(articles) {
@@ -819,8 +740,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         req.onsuccess = () => {
             let items = req.result || [];
-            console.log(`📱 Loading offline articles: Found ${items.length} total articles`);
-            
             // When offline, show the most recent articles (latest sessionTimestamp)
             if (items.length > 0) {
                 // Find the latest session timestamp
@@ -828,22 +747,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     return item.sessionTimestamp > latest ? item.sessionTimestamp : latest;
                 }, '');
                 
-                console.log(`🕒 Latest session timestamp: ${latestSession}`);
-                
                 // Only show articles from the latest session
                 items = items.filter(item => item.sessionTimestamp === latestSession);
-                
-                // Show available categories
-                const availableCategories = [...new Set(items.map(item => item.category))];
-                console.log(`📂 Available categories: ${availableCategories.join(', ')}`);
-                console.log(`✅ Total articles from latest session: ${items.length}`);
             }
             
             // Filter by category if not "general"
             if (currentCategory && currentCategory !== "general") {
-                const beforeFilter = items.length;
                 items = items.filter(item => item.category === currentCategory);
-                console.log(`🔍 Filtered ${currentCategory}: ${items.length} articles (from ${beforeFilter} total)`);
             }
             
             if (!items.length) {
