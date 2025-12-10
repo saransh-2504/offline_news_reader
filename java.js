@@ -78,9 +78,9 @@ document.addEventListener("DOMContentLoaded", () => {
     openReq.onsuccess = (e) => {
         db = e.target.result;
         
-        // Clear old cached articles (older than 24 hours) when online
+        // Clear all cached articles when starting a new online session
         if (navigator.onLine) {
-            clearOldArticles();
+            clearAllArticlesForFreshStart();
         }
         
         // Fix articles with undefined category
@@ -96,40 +96,26 @@ document.addEventListener("DOMContentLoaded", () => {
         checkLoginStatus();
     };
     
-    // Clear old cached articles (older than 24 hours)
-    function clearOldArticles() {
+    // Clear all articles to start fresh with latest news
+    function clearAllArticlesForFreshStart() {
         if (!db) return;
         
         try {
             const tx = db.transaction("articles", "readwrite");
             const store = tx.objectStore("articles");
-            const req = store.getAll();
             
-            req.onsuccess = () => {
-                const articles = req.result || [];
-                const now = new Date().getTime();
-                const oneDayAgo = now - (24 * 60 * 60 * 1000); // 24 hours in milliseconds
-                
-                // Create a new transaction for deletion
-                const deleteTx = db.transaction("articles", "readwrite");
-                const deleteStore = deleteTx.objectStore("articles");
-                
-                articles.forEach(article => {
-                    // Delete articles older than 24 hours
-                    if (article.publishedAt) {
-                        const articleTime = new Date(article.publishedAt).getTime();
-                        if (articleTime < oneDayAgo) {
-                            deleteStore.delete(article.id);
-                        }
-                    }
-                });
+            // Clear all articles to start fresh
+            const clearReq = store.clear();
+            
+            clearReq.onsuccess = () => {
+                console.log("Cleared all old articles for fresh start");
             };
             
-            req.onerror = () => {
+            clearReq.onerror = () => {
                 console.warn("Could not clear old articles");
             };
         } catch (err) {
-            console.warn("Error clearing old articles:", err);
+            console.warn("Error clearing articles:", err);
         }
     }
     
@@ -463,6 +449,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let searchText = ""; // Search keyword
     let pageIndex = 0; // Current page for API
     let isLoading = false; // Track if API call is in progress
+    let sessionTimestamp = new Date().toISOString(); // Track when this session started
     
     // Ensure currentCategory is never undefined
     function getCurrentCategory() {
@@ -570,6 +557,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             link: link,
                             image: a.image_url || a.image || "", // NewsData.io uses image_url
                             publishedAt: new Date().toISOString(), // Use current timestamp for cache management
+                            sessionTimestamp: sessionTimestamp, // Track which session this article belongs to
                             category: category
                         };
                         store.put(articleObj);
@@ -801,6 +789,17 @@ document.addEventListener("DOMContentLoaded", () => {
         req.onsuccess = () => {
             let items = req.result || [];
             
+            // When offline, show the most recent articles (latest sessionTimestamp)
+            if (items.length > 0) {
+                // Find the latest session timestamp
+                const latestSession = items.reduce((latest, item) => {
+                    return item.sessionTimestamp > latest ? item.sessionTimestamp : latest;
+                }, '');
+                
+                // Only show articles from the latest session
+                items = items.filter(item => item.sessionTimestamp === latestSession);
+            }
+            
             // Filter by category if not "general"
             if (currentCategory && currentCategory !== "general") {
                 items = items.filter(item => item.category === currentCategory);
@@ -811,6 +810,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     <div style="text-align: center; padding: 40px;">
                         <h3>📵 No cached ${currentCategory} articles available</h3>
                         <p>Please connect to the internet to load ${currentCategory} news.</p>
+                        <p style="margin-top: 20px; color: #666;">Browse categories while online to cache articles for offline viewing.</p>
                     </div>
                 `;
                 return;
@@ -1015,6 +1015,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         url: a.link,
                         image: a.image,
                         publishedAt: new Date().toISOString(),
+                        sessionTimestamp: sessionTimestamp, // Track which session this article belongs to
                         category: category
                     });
                 });
