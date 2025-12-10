@@ -78,7 +78,10 @@ document.addEventListener("DOMContentLoaded", () => {
     openReq.onsuccess = (e) => {
         db = e.target.result;
         
-        // Don't clear articles on startup - only clear when fetching new news
+        // Clear all articles when starting a new online session (fresh articles each time)
+        if (navigator.onLine) {
+            clearAllArticlesForFreshStart();
+        }
         
         // Fix articles with undefined category
         fixUndefinedCategories();
@@ -105,7 +108,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const clearReq = store.clear();
             
             clearReq.onsuccess = () => {
-                console.log("Cleared all old articles for fresh start");
+                console.log("✅ Cleared all old articles - starting fresh session");
+                // Set new session timestamp for this fresh start
+                sessionTimestamp = new Date().toISOString();
+                isNewSession = true;
             };
             
             clearReq.onerror = () => {
@@ -478,6 +484,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let pageIndex = 0; // Current page for API
     let isLoading = false; // Track if API call is in progress
     let sessionTimestamp = new Date().toISOString(); // Track when this session started
+    let isNewSession = true; // Track if this is a new browsing session
     
     // Ensure currentCategory is never undefined
     function getCurrentCategory() {
@@ -525,11 +532,12 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        // Clear all old articles before fetching new ones
-        await clearAllArticlesNow();
-        
-        // Update session timestamp for this new fetch
-        sessionTimestamp = new Date().toISOString();
+        // Don't clear articles when switching categories - accumulate all categories
+        // Use the same session timestamp for all categories in this session
+        if (isNewSession) {
+            console.log(`🆕 Starting new browsing session: ${sessionTimestamp}`);
+            isNewSession = false;
+        }
 
         isLoading = true;
         const url = buildApiURL();
@@ -566,6 +574,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     const store = tx.objectStore("articles");
                     const category = getCurrentCategory();
                     
+                    console.log(`💾 Storing ${data.articles.length} articles for category: ${category}`);
+                    
                     data.articles.forEach((a) => {
                         const link = a.url || a.link || "";
                         const articleObj = {
@@ -581,6 +591,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         };
                         store.put(articleObj);
                     });
+                    
+                    console.log(`✅ Successfully stored ${data.articles.length} ${category} articles`);
                 }
                 catch (err) {
                     console.warn("Could not write to DB articles store:", err);
@@ -817,16 +829,21 @@ document.addEventListener("DOMContentLoaded", () => {
                 }, '');
                 
                 console.log(`🕒 Latest session timestamp: ${latestSession}`);
-                console.log(`🕒 Current session timestamp: ${sessionTimestamp}`);
                 
                 // Only show articles from the latest session
                 items = items.filter(item => item.sessionTimestamp === latestSession);
-                console.log(`✅ Filtered to ${items.length} articles from latest session`);
+                
+                // Show available categories
+                const availableCategories = [...new Set(items.map(item => item.category))];
+                console.log(`📂 Available categories: ${availableCategories.join(', ')}`);
+                console.log(`✅ Total articles from latest session: ${items.length}`);
             }
             
             // Filter by category if not "general"
             if (currentCategory && currentCategory !== "general") {
+                const beforeFilter = items.length;
                 items = items.filter(item => item.category === currentCategory);
+                console.log(`🔍 Filtered ${currentCategory}: ${items.length} articles (from ${beforeFilter} total)`);
             }
             
             if (!items.length) {
