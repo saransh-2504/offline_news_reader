@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   const { q, category = "general" } = req.query;
 
   // Your GNews API key
-  const API_KEY = "bb2cdaf3dbb268ba34de8464463e3b2f";
+  const API_KEY = "994ad92756a3d2e963f645d08c268201";
   
   let url;
   
